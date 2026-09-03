@@ -1,136 +1,144 @@
-# 🖼️ pi-sixel
+# 🖼️ pi-images
 
 [https://kyaulabs.com/](https://kyaulabs.com/)
 
 [![Conventional Commits](https://img.shields.io/badge/conventional%20commits-1.0.0-fe5196?style=flat&logo=conventionalcommits)](https://www.conventionalcommits.org/en/v1.0.0/)
-[![GitHub](https://img.shields.io/github/license/kyaulabs/pi-sixel?logo=gnu)](LICENSE)
+[![GitHub](https://img.shields.io/github/license/kyaulabs/pi-images?logo=gnu)](LICENSE)
 
-A [Pi](https://github.com/earendil-works/pi-mono) extension that translates Pi's Kitty image output into DEC SIXEL so tmux can own, redraw, scroll, and clear inline images correctly.
+A [Pi](https://github.com/earendil-works/pi-mono) extension that preserves inline images inside tmux. It translates Pi's Kitty graphics output into either Kitty Unicode placeholders or DEC SIXEL, depending on the outer terminal.
 
 > [!WARNING]
 > Pi does not currently expose an API for registering image protocols. This package uses a guarded terminal-output bridge and may require updates when Pi's TUI output changes.
 
 ## Why
 
-Pi intentionally disables inline image detection inside tmux because a passed-through Kitty placement exists outside tmux's screen model. The outer terminal displays it, but tmux cannot move or remove it when a pane scrolls, resizes, hides, or switches windows. The result is stale images and placements accumulating at incorrect coordinates.
+Pi intentionally disables inline image detection inside tmux because a passed-through classic Kitty placement exists outside tmux's screen model. The terminal displays it, but tmux cannot reliably move or remove it when a pane scrolls, resizes, hides, or switches windows. The result is stale images at incorrect coordinates.
 
-`pi-sixel` lets Pi create its normal chunked PNG transmission, consumes that transmission before tmux sees it, and writes SIXEL in its place:
+`pi-images` makes the placement visible to tmux:
 
 ```text
 Pi Image component
       │ Kitty APC chunks
       ▼
-pi-sixel stream bridge ── decode / resize / quantize / cache
-      │ SIXEL DCS
-      ▼
-     tmux ── owns the image as pane content
-      │
-      ▼
-SIXEL-capable terminal
+pi-images streaming bridge
+      ├─ Ghostty ── Kitty upload + Unicode placeholder cells
+      └─ SIXEL terminal ── decode / resize / quantize / cache
+                              │
+                              ▼
+                             tmux owns placement as pane content
 ```
 
-The encoder is implemented in TypeScript. No `img2sixel` executable is required.
+### Ghostty mode
+
+Ghostty 1.3.1 does not implement SIXEL. For Ghostty, the extension passes Kitty image uploads through tmux, creates virtual placements, and emits Kitty Unicode placeholder cells. The cells belong to tmux's text grid, so image placement follows clearing, scrolling, and redraws.
+
+### SIXEL mode
+
+For terminals that genuinely implement SIXEL, the extension decodes Pi's PNG or JPEG transmission and emits tmux-managed SIXEL. The encoder is implemented in TypeScript; `img2sixel` is not required.
 
 ## Requirements
 
 - Node.js 22 or newer
 - Pi 0.84.4 or newer
-- tmux built with SIXEL support (`tmux display -p '#{sixel_support}'` prints `1`)
-- A SIXEL-capable outer terminal, such as Ghostty
-- Python 3 for automatic terminal pixel-size discovery on Unix; fixed environment overrides are available as a fallback
+- tmux 3.4 or newer
+- One of:
+  - Ghostty with Kitty Unicode-placeholder support and tmux `allow-passthrough`
+  - A SIXEL-capable outer terminal and tmux built with SIXEL support
+- Python 3 only for automatic pixel sizing in SIXEL mode; fixed overrides are available
 
 ## Installation
 
 ### Local development checkout
 
 ```sh
-pi install /home/kyau/projects/kyaulabs/pi-sixel
+pi install /home/kyau/projects/kyaulabs/pi-images
 ```
 
 ### GitHub
 
 ```sh
-pi install git:github.com/kyaulabs/pi-sixel
+pi install git:github.com/kyaulabs/pi-images
 ```
 
 Restart Pi after installation.
 
 ## tmux configuration
 
-Mark the outer terminal as SIXEL-capable. For Ghostty:
+### Ghostty
+
+Enable passthrough so image uploads and virtual-placement commands can reach Ghostty:
 
 ```tmux
-set -as terminal-features ",xterm-ghostty:sixel"
+set -g allow-passthrough on
+set -as terminal-features ",xterm-ghostty:extkeys"
 ```
 
-If the same entry already enables extended keys, combine the features:
+Do **not** add the `sixel` feature for Ghostty. Ghostty 1.3.1 rejects SIXEL DCS sequences.
+
+### SIXEL terminals
+
+Mark the actual outer terminal as SIXEL-capable, replacing the pattern as needed:
 
 ```tmux
-set -as terminal-features ",xterm-ghostty:extkeys:sixel"
+set -as terminal-features ",xterm-sixel:sixel"
 ```
 
-Reload the configuration, then detach and reattach the client so tmux recalculates its client features:
+After changing terminal features, reload the configuration and detach/reattach the tmux client:
 
 ```sh
 tmux source-file ~/.tmux.conf
 tmux detach-client
+# Run this from the outer terminal after detaching:
+tmux attach
 ```
-
-Verify the attached client:
-
-```sh
-tmux display -p '#{client_termfeatures}' | tr ',' '\n' | grep '^sixel$'
-```
-
-`allow-passthrough` is not required by this extension because tmux parses the generated SIXEL itself.
 
 ## Usage
 
-The extension activates automatically only when all of the following are true:
+The extension activates only for an interactive Pi process inside tmux. In automatic mode it chooses:
 
-- Pi is interactive and stdout is a terminal.
-- Pi is running inside tmux.
-- tmux reports compiled SIXEL support.
-- The attached client has the `sixel` terminal feature.
-- Image output has not been explicitly disabled.
+- `kitty-placeholder` for a Ghostty client when `allow-passthrough` is enabled
+- `sixel` when tmux reports compiled SIXEL support and the client has the `sixel` feature
+- no bridge when neither safe mode is available
 
-Use the command below inside Pi to inspect activation and cache statistics:
+Inspect activation and runtime statistics inside Pi:
 
 ```text
-/sixel-status
+/images-status
 ```
+
+`/sixel-status` remains as a compatibility alias.
 
 Outside tmux, the extension remains inactive and Pi uses its normal image protocol detection.
 
 ## Configuration
 
-Environment variables are optional:
-
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `PI_SIXEL=0` | Disable the extension | unset |
-| `PI_SIXEL=1` | Bypass tmux feature detection | unset |
-| `PI_SIXEL_COLORS` | Maximum generated palette size, from 2 to 254 | `128` |
-| `PI_SIXEL_CELL_WIDTH` | Override terminal cell width in pixels | detected |
-| `PI_SIXEL_CELL_HEIGHT` | Override terminal cell height in pixels | detected |
+| `PI_IMAGES=0` | Disable the extension | unset |
+| `PI_IMAGES_MODE=kitty-placeholder` | Force Kitty Unicode placeholders | automatic |
+| `PI_IMAGES_MODE=sixel` | Force SIXEL output | automatic |
+| `PI_IMAGES_COLORS` | SIXEL palette size, from 2 to 254 | `128` |
+| `PI_IMAGES_CELL_WIDTH` | SIXEL terminal-cell width in pixels | detected |
+| `PI_IMAGES_CELL_HEIGHT` | SIXEL terminal-cell height in pixels | detected |
 
-Both cell-size overrides must be set together. Automatic detection reads the pseudo-terminal's `TIOCGWINSZ` pixel dimensions through Python.
+Both cell-size overrides must be set together. Legacy `PI_SIXEL` and `PI_SIXEL_*` variables remain accepted for compatibility.
 
-Explicit `PI_IMAGE_PROTOCOL=none`, `0`, or `iterm2` prevents activation. Otherwise the extension selects Pi's Kitty encoder internally and consumes those Kitty commands before they reach tmux.
+Explicit `PI_IMAGE_PROTOCOL=none`, `0`, or `iterm2` prevents activation. Otherwise the extension selects Pi's Kitty encoder internally and consumes its commands before they reach tmux.
 
 ## Supported image flow
 
-The bridge handles:
+The streaming bridge handles:
 
 - Single and multi-chunk Kitty transmissions
-- Kitty commands split across separate `stdout.write()` calls
-- Placement-only redraw commands used by Pi's fullscreen TUI
+- Kitty commands split across arbitrary `stdout.write()` boundaries
+- Placement-only redraw commands
 - PNG and JPEG payloads
-- Source cropping used when fullscreen content is partially visible
-- Cursor preservation
-- LRU caching of converted SIXEL data
+- Source cropping for partially visible content
+- Kitty image and placement deletion
+- Cursor-safe placeholder grids
+- Bounded SIXEL conversion caching
 
-Pi normally converts terminal-bound image content to PNG. Unsupported or malformed payloads are dropped rather than leaked into tmux.
+Malformed image commands are dropped rather than leaked into the terminal.
 
 ## Development
 
@@ -140,17 +148,21 @@ npm run hooks:install
 npm run check
 ```
 
-The tracked Git hooks require `gitleaks`, run the verification suite before commits, and reject non-Conventional Commit messages. GitHub Actions applies the same commit-message policy to pushed and pull-request commits.
+The tracked Git hooks require `gitleaks`, run the verification suite before commits, and reject non-Conventional Commit messages. GitHub Actions applies the same policy to pushed and pull-request commits.
 
-The test suite exercises the encoder, Kitty chunk reassembly, arbitrary stream boundaries, placement replay, deletion, and terminal pixel-size parsing.
+The tests cover SIXEL encoding, Kitty chunk reassembly, arbitrary stream boundaries, virtual placeholder output, placement replay, deletion, and terminal pixel-size parsing.
 
 ## Limitations
 
-- SIXEL uses a reduced palette and can be larger than the original PNG.
-- Initial conversion is synchronous because Pi's component rendering and terminal write path are synchronous. Cached redraws avoid repeating the work.
-- The bridge limits target images to 2.5 million pixels and bounds its render cache.
-- Terminal cell-size auto-detection currently targets Unix-like systems with Python 3.
-- A future Pi release that changes Kitty output or adds native SIXEL support may require this bridge to change or become unnecessary.
+- Kitty placeholder mode requires tmux passthrough for image-control commands, although tmux owns the visible placeholder cells.
+- SIXEL uses a reduced palette and may be larger than the source PNG.
+- Initial SIXEL conversion is synchronous; cached redraws avoid repeated work.
+- The bridge limits target SIXEL images to 2.5 million pixels and bounds its cache.
+- A future Pi release that adds a native extensible image backend may make this bridge unnecessary.
+
+## Attribution
+
+Kitty Unicode placeholder helpers are adapted from `pi-tmux-images` and `pi-sprite` under the MIT License. See [NOTICE](NOTICE).
 
 ## License
 

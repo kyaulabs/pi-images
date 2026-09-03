@@ -1,29 +1,31 @@
 {
-  "name": "@kyaulabs/pi-sixel",
+  "name": "@kyaulabs/pi-images",
   "version": "0.1.0",
-  "description": "SIXEL image bridge for Pi sessions running inside tmux",
+  "description": "Tmux-safe inline image bridge for Pi using Kitty placeholders or SIXEL",
   "type": "module",
   "license": "AGPL-3.0-only",
   "author": "KYAU Labs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kyaulabs/pi-sixel.git"
+    "url": "git+https://github.com/kyaulabs/pi-images.git"
   },
-  "homepage": "https://github.com/kyaulabs/pi-sixel#readme",
+  "homepage": "https://github.com/kyaulabs/pi-images#readme",
   "bugs": {
-    "url": "https://github.com/kyaulabs/pi-sixel/issues"
+    "url": "https://github.com/kyaulabs/pi-images/issues"
   },
   "keywords": [
     "pi-package",
     "pi-extension",
     "sixel",
+    "kitty-graphics",
     "tmux",
     "terminal-images"
   ],
   "files": [
     "src",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "pi": {
     "extensions": [

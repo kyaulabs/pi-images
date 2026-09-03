@@ -1,15 +1,21 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { acquireBridge, formatBridgeStatus } from "./runtime.js";
 
-export default function piSixel(pi: ExtensionAPI): void {
+export default function piImages(pi: ExtensionAPI): void {
   const bridge = acquireBridge();
+  const showStatus = async (_args: string, context: ExtensionCommandContext) => {
+    context.ui.notify(formatBridgeStatus(bridge), bridge.active ? "info" : "warning");
+  };
+
+  pi.registerCommand("images-status", {
+    description: "Show the tmux image bridge mode and runtime statistics",
+    handler: showStatus,
+  });
 
   pi.registerCommand("sixel-status", {
-    description: "Show Pi SIXEL bridge status and conversion statistics",
-    handler: async (_args, context) => {
-      context.ui.notify(formatBridgeStatus(bridge), bridge.active ? "info" : "warning");
-    },
+    description: "Alias for /images-status",
+    handler: showStatus,
   });
 
   pi.on("session_shutdown", async () => {
