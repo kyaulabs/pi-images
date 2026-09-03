@@ -1,34 +1,48 @@
 ---
-name: "\U0001F41B Bug Report"
-about: "If something isn't working as expected \U0001F914."
-title: ''
-labels: 'i: bug, i: needs triage'
-assignees: ''
-
+name: "🐛 Bug Report"
+about: "Report incorrect image rendering or extension behavior."
+title: ""
+labels: "i: bug, i: needs triage"
+assignees: ""
 ---
 
 ## Bug Report
 
 ### Environment
-| Hardware        | Model                      |
-| ----------------| -------------------------- |
-| Platform        | *Desktop, Laptop, or Tablet* |
-| CPU             |                            |
-| GPU             |                            |
-| HDD             | *Disk, SSD, or NVME*       |
-| Windows Version | *Pro N*                    |
-| Windows Build   | *22621.169*                |
 
-### What is the expected behavior?
+| Component | Version or value |
+| --- | --- |
+| Operating system | |
+| Pi | |
+| Node.js | |
+| tmux | |
+| Outer terminal | |
+| `TERM` | |
+| `client_termfeatures` | |
+| Pi TUI mode | regular / fullscreen |
 
-### What is the actual behavior?
+Paste the output of `/sixel-status` here:
 
-### Additional information to reproduce the issue?
+```text
 
-Add any other content about the problem here. If applicable, add screenshots to help explain.
+```
 
-### Possible Solution?
+### Expected behavior
 
-### If the bug is confirmed, would you be willing to submit a PR?
+### Actual behavior
 
-Yes / No *(Help can be provided if you need assistance submitting a PR)*
+### Reproduction steps
+
+1.
+2.
+3.
+
+### Additional information
+
+Include a screenshot and the image format/dimensions when applicable. Do not attach private or sensitive images.
+
+### Possible solution
+
+### Would you be willing to submit a PR?
+
+Yes / No *(Help can be provided if you need assistance submitting a PR.)*

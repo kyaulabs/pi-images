@@ -8,15 +8,24 @@ Thanks for taking an interest in this project. We want to make contributing to t
 * Proposing new features
 * Becoming a maintainer
 
-## We Develop with Github
+## We Develop with GitHub
 
-We use Github to host code, to track issues and feature requests, as well as accept pull requests. Discussion and general support is typically done through Discord.
+We use GitHub to host code, track issues and feature requests, and accept pull requests. Discussion and general support are typically handled through Discord.
 
 ## We Use [Git Flow](https://www.gitkraken.com/learn/git/git-flow)
 
 <div align="center" style="background:#0d1117"><img src=".github/media/git-flow.svg" width="240" height="365" style="margin-bottom:2ch" /></div>
 
-All code changes happen through pull requests and are the best way to propose changes to the codebase. We actively welcome your pull requests:
+All code changes happen through pull requests and are the best way to propose changes to the codebase. After cloning, install dependencies and activate the tracked Git hooks:
+
+```sh
+npm install
+npm run hooks:install
+```
+
+The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). The hooks run the package checks, scan for secrets, and enforce Conventional Commit messages. CI enforces the same commit-message convention for pushed and pull-request commits.
+
+We actively welcome your pull requests:
 
 1. Fork the repo and create your own branch off of the `develop` branch.
 2. Name your branch `feat/<name>-<hash>-<desc>` where:
@@ -25,8 +34,8 @@ All code changes happen through pull requests and are the best way to propose ch
    * `<desc>` is a short description using hyphen as a separator
 3. If you have added code that should be tested, add tests.
 4. If you have changed APIs, update the documentation.
-5. Ensure it passes whatever tests are being used.
-6. Make sure your code lints.
+5. Run `npm run check` and ensure all checks pass.
+6. Verify the extension in a SIXEL-capable tmux client when changing terminal behavior.
 7. Issue the pull request!
 
 ## Reporting Bugs / Feature Requests
