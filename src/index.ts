@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 
 import { acquireBridge, formatBridgeStatus } from "./runtime.js";
 
+/** Register the process-wide image bridge and its status commands. */
 export default function piImages(pi: ExtensionAPI): void {
   const bridge = acquireBridge();
   const showStatus = async (_args: string, context: ExtensionCommandContext) => {

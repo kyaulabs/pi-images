@@ -1,30 +1,42 @@
 ---
-name: "\U0001F680 Feature Request"
-about: "I have a suggestion (and may want to implement it \U0001F642)!"
-title: ''
-labels: 'i: enhancement, i: needs triage'
-assignees: ''
-
+name: "Feature request"
+about: "Propose a change to pi-images"
+title: ""
+labels: "i: enhancement, i: needs triage"
+assignees: ""
 ---
 
-## Feature Request
+## Goal
 
-### What exactly are you trying to accomplish?
+What should a user be able to do?
 
-*Context matters. What are you trying to do? Is this something you currently cannot do?*
+## Current behavior
 
-### Is your feature request related to an issue, problem or flaw?
+What happens now, and which terminal, tmux, or Pi configuration is involved?
 
-*Clear and concise description of what the problem is.*
+## Proposed change
 
-### Proposed Solution
+Describe the public behavior, configuration, or protocol change. Include example commands or output when they clarify the request.
 
-*Clear and concise description of what you want to happen. Add any considered drawbacks.*
+## Alternatives
 
-### Alternative Solutions
+List other approaches you considered and the specific tradeoffs that ruled them out.
 
-*Clear and concise description of alternative solutions or methods you have considered. Is the alternative considerable?*
+## Compatibility
 
-### If the feature request is approved, would you be willing to submit a PR?
+Which output modes does this affect?
 
-Yes / No *(Help can be provided if you need assistance submitting a PR)*
+- [ ] Kitty Unicode placeholders
+- [ ] SIXEL
+- [ ] Both modes
+- [ ] Package or TPM installation only
+
+Note any minimum Pi, tmux, Node.js, or terminal version changes.
+
+## Validation
+
+How could an implementation be tested automatically and in a real terminal?
+
+## Contribution
+
+Would you be willing to implement the change after it is approved?

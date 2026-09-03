@@ -1,20 +1,35 @@
-# Repository Guidance
+# Repository guidance
 
 ## Scope
 
-`pi-images` is a Pi extension that translates Kitty graphics emitted by Pi into tmux-safe image output. Ghostty uses Kitty Unicode placeholders; genuinely SIXEL-capable terminals use SIXEL. Keep the bridge limited to interactive tmux sessions and fail closed: malformed image commands must never leak raw payload bytes to the terminal.
+`pi-images` translates the Kitty graphics emitted by Pi into image output that tmux can track. Ghostty uses Kitty Unicode placeholders. Terminals that implement SIXEL may use SIXEL.
 
-## Development
+Limit the bridge to interactive tmux sessions. Fail closed: malformed, incomplete, oversized, or unsupported image commands must not leak payload bytes to the terminal.
 
-- Use TypeScript with strict type checking.
-- Keep runtime dependencies pure JavaScript when practical.
-- Preserve arbitrary stream-boundary handling in `KittyStreamTranslator`.
-- Keep Kitty upload commands wrapped in tmux passthrough while emitting placeholder cells as normal terminal text.
+## Development rules
+
+- Use strict TypeScript.
+- Prefer pure JavaScript runtime dependencies.
+- Preserve arbitrary byte-boundary handling in `KittyStreamTranslator`.
+- Wrap Kitty uploads and virtual-placement commands in tmux passthrough.
+- Emit Kitty placeholder cells as normal pane text so tmux owns their positions.
 - Do not advertise SIXEL for a terminal that does not implement it.
-- Bound image dimensions, transmission sizes, and caches.
-- Add regression tests for parser, cursor, cache, or protocol changes.
-- Run `npm run check` before submitting changes.
+- Keep transmission, image, pixel, and cache limits explicit and tested.
+- Keep `pi-images.tmux` compatible with TPM and valid under ShellCheck.
+- Add a regression test for parser, cursor, cache, protocol, or activation changes.
+- Update README setup and troubleshooting text when public behavior changes.
+
+## Verification
+
+Run:
+
+```sh
+npm run check
+npm pack --dry-run
+```
+
+Protocol changes require a visual test in the affected terminal and tmux mode. Test clearing, scrolling, resizing, redraws, and window switching when placement behavior changes.
 
 ## Commits
 
-Use Conventional Commits and branch from `develop` according to `CONTRIBUTING.md`.
+Use Conventional Commits. Branch from `develop` and follow [CONTRIBUTING.md](CONTRIBUTING.md).

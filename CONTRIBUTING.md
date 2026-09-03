@@ -1,47 +1,107 @@
 # Contributing
 
-Thanks for taking an interest in this project. We want to make contributing to this project as easy and transparent as possible, whether it is:
+Use GitHub issues for confirmed bugs and focused feature proposals. Use pull requests for code and documentation changes.
 
-* Reporting a bug
-* Discussing the current state of the code
-* Submitting a fix
-* Proposing new features
-* Becoming a maintainer
+## Development model
 
-## We Develop with GitHub
+The repository uses [Git Flow](https://www.gitkraken.com/learn/git/git-flow). Create work from `develop`; release changes merge to the release branch through the project release process.
 
-We use GitHub to host code, track issues and feature requests, and accept pull requests. Discussion and general support are typically handled through Discord.
+<div align="center" style="background:#0d1117"><img src=".github/media/git-flow.svg" width="240" height="365" alt="Git Flow branch diagram" /></div>
 
-## We Use [Git Flow](https://www.gitkraken.com/learn/git/git-flow)
+Name a work branch with this format:
 
-<div align="center" style="background:#0d1117"><img src=".github/media/git-flow.svg" width="240" height="365" style="margin-bottom:2ch" /></div>
+```text
+<type>/<github-user>-<random-id>-<description>
+```
 
-All code changes happen through pull requests and are the best way to propose changes to the codebase. After cloning, install dependencies and activate the tracked Git hooks:
+Generate the four-character ID with:
+
+```sh
+openssl rand -hex 2
+```
+
+For example:
+
+```text
+fix/kyau-a0e7-placeholder-cropping
+```
+
+Use a Conventional Commit type such as `feat`, `fix`, `docs`, `test`, `refactor`, or `ci` for `<type>`.
+
+## Set up the checkout
+
+Requirements for contribution checks:
+
+- Node.js 22 or newer
+- npm
+- [gitleaks](https://github.com/gitleaks/gitleaks)
+- [ShellCheck](https://www.shellcheck.net/)
+
+Install dependencies and point Git at the tracked hooks:
 
 ```sh
 npm install
 npm run hooks:install
 ```
 
-The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). The hooks run the package checks, scan for secrets, and enforce Conventional Commit messages. CI enforces the same commit-message convention for pushed and pull-request commits.
+`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation.
 
-We actively welcome your pull requests:
+## Make a change
 
-1. Fork the repo and create your own branch off of the `develop` branch.
-2. Name your branch `feat/<name>-<hash>-<desc>` where:
-   * `<name>` is your Github username
-   * `<hash>` is equal to `openssl rand hex 2`
-   * `<desc>` is a short description using hyphen as a separator
-3. If you have added code that should be tested, add tests.
-4. If you have changed APIs, update the documentation.
-5. Run `npm run check` and ensure all checks pass.
-6. Verify the extension in a SIXEL-capable tmux client when changing terminal behavior.
-7. Issue the pull request!
+1. Branch from the current `develop` branch.
+2. Keep protocol parsing and cache limits explicit.
+3. Add a regression test for behavior changes.
+4. Update the public documentation when setup, output, or configuration changes.
+5. Run the checks below.
+6. Open a pull request against `develop`.
 
-## Reporting Bugs / Feature Requests
+Do not allow malformed or partial Kitty payloads to reach terminal output. Preserve arbitrary byte-boundary handling when changing `KittyStreamTranslator`.
 
-We use Github issues to track public bugs and feature requests. Report a bug/feature by [opening a new issue](/../../issues); it is that easy!
+## Validate the change
 
-## Contributions & Software Licensing
+Run the automated checks:
 
-In short, when you submit code changes, your submissions are understood to be under the same [license](LICENSE) that covers the project itself. If you have a concern about this, please refrain from submitting a PR and contact a maintainer directly.
+```sh
+npm run check
+npm pack --dry-run
+```
+
+Changes to `pi-images.tmux` must pass ShellCheck. Changes to terminal protocols also need a visual test in each affected path:
+
+- Ghostty Kitty placeholders inside tmux
+- SIXEL inside tmux, when the change affects SIXEL
+- regular and fullscreen Pi TUI modes, when rendering order changes
+- clearing, scrolling, resizing, and switching tmux windows
+
+Record the terminal, tmux, Pi, and output mode versions in the pull request.
+
+## Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
+
+```text
+<type>(<optional-scope>): <summary>
+```
+
+Write the title as a short command. Use the body for rationale, constraints, migration notes, and test evidence. Commitlint enforces the format locally and in CI.
+
+## Pull requests
+
+A pull request should explain:
+
+- the observed problem;
+- the mechanism that caused it;
+- the chosen change and relevant tradeoffs; and
+- the automated and visual tests performed.
+
+Keep unrelated changes in separate pull requests. Update tests and documentation in the same pull request as the behavior they cover.
+
+## Report a bug or request a feature
+
+Open an issue with the repository templates at [GitHub Issues](/../../issues). Image bugs need `/images-status` output and enough environment detail to identify the selected protocol path.
+
+Do not attach sensitive images, terminal logs containing image payloads, credentials, or private session content.
+
+## License
+
+Contributions are submitted under the project's [GNU Affero General Public License v3.0](LICENSE). Do not submit code that cannot be distributed under that license. Preserve third-party notices and compatible license text when adapting existing work.

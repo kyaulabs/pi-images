@@ -26,6 +26,7 @@ interface GlobalBridge {
   uninstall: () => void;
 }
 
+/** Activation result and release handle owned by one loaded extension instance. */
 export interface BridgeHandle {
   active: boolean;
   reason: string;
@@ -40,6 +41,7 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
   return parsed > 0 ? parsed : undefined;
 }
 
+/** Parse `rows columns width-px height-px` and derive one cell's pixel size. */
 export function parseTerminalSize(value: string): CellDimensions | undefined {
   const match = /^(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/.exec(value.trim());
   if (!match) return undefined;
@@ -78,6 +80,7 @@ function queryTerminalCellDimensions(): CellDimensions | undefined {
   return result.status === 0 ? parseTerminalSize(result.stdout) : undefined;
 }
 
+/** Create a cached terminal-cell probe for SIXEL sizing. */
 export function createCellDimensionProvider(): () => CellDimensions {
   let cached = queryTerminalCellDimensions() ?? DEFAULT_CELL_DIMENSIONS;
   let queriedAt = Date.now();
@@ -213,14 +216,18 @@ function installBridge(mode: TranslationMode): GlobalBridge {
   return bridge;
 }
 
+/**
+ * Detect a safe tmux image mode and install the process-wide output bridge.
+ * The caller must invoke `release` when its extension session shuts down.
+ */
 export function acquireBridge(): BridgeHandle {
   const activation = detectActivation();
   if (!activation.active) {
     return { active: false, reason: activation.reason, release: () => {} };
   }
 
-  // Pi has no SIXEL backend. Make its image components produce chunked PNG via
-  // Kitty, then translate those terminal bytes before tmux receives them.
+  // Pi has no third-party image backend. Ask it for Kitty output, then convert
+  // those terminal bytes into the mode selected for the attached tmux client.
   process.env.PI_IMAGE_PROTOCOL = "kitty";
   const bridge = installBridge(activation.mode ?? "sixel");
   let released = false;
@@ -238,6 +245,7 @@ export function acquireBridge(): BridgeHandle {
   };
 }
 
+/** Format activation details and live counters for display inside Pi. */
 export function formatBridgeStatus(handle: BridgeHandle): string {
   if (!handle.active || !handle.stats) return `pi-images: inactive (${handle.reason})`;
   const stats = handle.stats;

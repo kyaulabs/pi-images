@@ -1,5 +1,6 @@
-pi-images includes Kitty Unicode placeholder protocol helpers adapted from
-pi-tmux-images, which adapted the protocol structure from pi-sprite.
+The Kitty Unicode placeholder helpers in src/kitty-placeholder.ts are adapted
+from pi-tmux-images (https://github.com/safurrier/pi-tmux-images), which adapted
+the protocol structure from pi-sprite. Both sources use the MIT License below.
 
 MIT License
 

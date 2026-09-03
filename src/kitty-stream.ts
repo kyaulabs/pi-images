@@ -18,19 +18,23 @@ const MAX_TARGET_PIXELS = 2_500_000;
 const MAX_CACHE_BYTES = 96 * 1024 * 1024;
 const MAX_CACHE_ENTRIES = 96;
 
+/** Terminal cell dimensions used to size SIXEL output. */
 export interface CellDimensions {
   widthPx: number;
   heightPx: number;
 }
 
+/** Output protocol produced from intercepted Kitty commands. */
 export type TranslationMode = "sixel" | "kitty-placeholder";
 
+/** Runtime dependencies and encoding options for a translator instance. */
 export interface TranslatorOptions {
   getCellDimensions: () => CellDimensions;
   mode?: TranslationMode;
   maxColors?: number;
 }
 
+/** Mutable counters exposed by the `/images-status` command. */
 export interface TranslatorStats {
   transmissions: number;
   placements: number;
@@ -102,7 +106,12 @@ function sourceCrop(controls: Controls, image: RgbaImage): CropRect {
   });
 }
 
-/** Stateful Kitty APC-to-SIXEL translator. Input and output are raw terminal bytes. */
+/**
+ * Translates a raw Kitty APC byte stream into tmux-safe image output.
+ *
+ * The instance retains incomplete APC commands between `push` calls. Callers
+ * must preserve instance order and must not write intercepted chunks elsewhere.
+ */
 export class KittyStreamTranslator {
   readonly stats: TranslatorStats = {
     transmissions: 0,
@@ -131,6 +140,7 @@ export class KittyStreamTranslator {
     this.maxColors = Math.max(2, Math.min(254, Math.floor(options.maxColors ?? 128)));
   }
 
+  /** Consume one terminal-output chunk and return bytes that are safe to write. */
   push(chunk: Buffer): Buffer {
     if (chunk.length === 0) return Buffer.alloc(0);
     const data = this.pendingBytes.length > 0 ? Buffer.concat([this.pendingBytes, chunk]) : chunk;
@@ -163,6 +173,7 @@ export class KittyStreamTranslator {
     return output.length === 0 ? Buffer.alloc(0) : Buffer.concat(output);
   }
 
+  /** Discard buffered commands, image sources, and rendered SIXEL entries. */
   reset(): void {
     this.pendingBytes = Buffer.alloc(0);
     this.transmission = undefined;

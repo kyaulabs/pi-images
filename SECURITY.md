@@ -1,37 +1,54 @@
-# Security Policy
+# Security policy
 
-This document outlines security procedures and general policies.
+## Supported versions
 
-* [Supported Version](#supported-versions)
-* [Reporting a Bug](#reporting-a-bug)
-* [Disclosure Policy](#disclosure-policy)
-* [Comments](#comments)
+Before the first stable release, security fixes apply to the current `0.1.x` line.
 
-## Supported Versions
+| Version | Supported |
+| --- | --- |
+| `0.1.x` | Yes |
+| Earlier versions | No |
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1.0 | :x:                |
+## Report a vulnerability
 
-## Reporting a Bug
+Send security reports to [git@kyaulabs.com](mailto:git@kyaulabs.com). Do not open a public issue for an unpatched vulnerability.
 
-The team and community take all security bugs seriously. Thank you for improving the security. We appreciate your efforts and responsible disclosure and will make every effort to acknowledge your contributions.
+Include:
 
-Report security bugs by emailing the lead maintainer at [mailto:git@kyaulabs.com](git@kyaulabs.com).
+- the affected version or commit;
+- the Pi, Node.js, tmux, and outer-terminal versions;
+- the active mode reported by `/images-status`;
+- steps or a minimal input that reproduces the problem;
+- the expected security impact; and
+- any known workaround.
 
-The lead maintainer will acknowledge your email within 48 hours, and will send a more detailed response within 48 hours indicating the next steps in handling your report. After the initial reply to your report, the security team will endeavor to keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance.
+Remove credentials, private images, session content, and unrelated terminal logs. If the report requires sensitive material, ask the maintainer how to transfer it.
 
-Report security bugs in third-party modules/packages to the person or team maintaining the module and/or package.
+The lead maintainer will acknowledge the report within 48 hours and provide the next step or request more information within another 48 hours.
 
-## Disclosure Policy
+Report vulnerabilities in a third-party dependency to that dependency's maintainers. Contact this project as well when the dependency issue affects `pi-images` users.
 
-When the security team receives a security bug report, they will assign it to a primary handler. This person will coordinate the fix and release process, involving the following steps:
+## Security boundaries
 
-* Confirm the problem and determine the affected versions.
-* Audit code to find any potential similar problems.
-* Prepare fixes for all releases still under maintenance. These fixes will be released as fast as possible.
+`pi-images` runs in the Pi process with the user's permissions. While active, it intercepts terminal writes, decodes untrusted image payloads in SIXEL mode, and sends graphics commands to tmux or the outer terminal. Relevant reports include:
 
-## Comments
+- a Kitty payload escaping the streaming parser and reaching the terminal as raw text;
+- malformed image data causing unbounded memory or CPU use;
+- cache or size limits that can be bypassed;
+- terminal control injection through parsed Kitty fields;
+- image data reaching an unintended terminal, log, or session artifact; and
+- package or TPM installation behavior that executes unintended commands.
 
-If you have suggestions on how this process could be improved please submit a pull request.
+The extension does not change which image content Pi sends to the model. It only changes terminal output. Kitty-placeholder mode sends encoded image bytes to the outer terminal through tmux passthrough. SIXEL mode decodes and converts those bytes in the Pi process.
+
+## Disclosure process
+
+After receiving a report, the maintainer will:
+
+1. reproduce the issue and identify affected versions;
+2. inspect related parser and protocol paths;
+3. prepare and test a fix for supported versions;
+4. coordinate a release and disclosure date with the reporter when practical; and
+5. publish the fix and relevant upgrade guidance.
+
+Submit improvements to this policy through a pull request when they do not disclose an active vulnerability.

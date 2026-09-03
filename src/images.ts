@@ -5,6 +5,7 @@ import type { RgbaImage } from "./sixel.js";
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
+/** Decode PNG or JPEG bytes into RGBA pixels; return undefined for invalid or unsupported input. */
 export function decodeImage(data: Buffer): RgbaImage | undefined {
   try {
     if (data.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {

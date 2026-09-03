@@ -266,13 +266,16 @@ const ROW_COLUMN_DIACRITICS = [
 	"\u{A8E5}",
 ] as const;
 
+/** Wrap one terminal sequence in tmux passthrough and escape nested ESC bytes. */
 export function tmux(sequence: string): string {
 	return `${ESC}Ptmux;${sequence.replaceAll(ESC, ESC + ESC)}${ESC}\\`;
 }
+/** Build a complete Kitty APC command, optionally wrapped for tmux. */
 export function kitty(command: string, inTmux: boolean): string {
 	const sequence = `${ESC}_G${command}${ESC}\\`;
 	return inTmux ? tmux(sequence) : sequence;
 }
+/** Split encoded image data into Kitty transmission commands of at most 4096 characters. */
 export function upload(base64: string, imageId: number, format: number, inTmux: boolean): string[] {
 	const chunks = base64.match(/.{1,4096}/gu) ?? [""];
 	return chunks.map((chunk, index) =>
@@ -283,6 +286,7 @@ function placementId(imageId: number): number {
 	return imageId & 0xffffff || 1;
 }
 
+/** Optional source rectangle for a virtual Kitty placement. */
 export interface PlaceholderCrop {
 	x?: number;
 	y?: number;
@@ -290,6 +294,7 @@ export interface PlaceholderCrop {
 	height?: number;
 }
 
+/** Create a virtual placement referenced by Unicode placeholder cells. */
 export function placement(
 	imageId: number,
 	columns: number,
@@ -313,6 +318,7 @@ export function placement(
 export function deletePlacement(imageId: number, inTmux: boolean): string {
 	return kitty(`a=d,d=i,i=${imageId},p=${placementId(imageId)},q=2;`, inTmux);
 }
+/** Delete uploaded Kitty image data and all placements for one image ID. */
 export function deleteImage(imageId: number, inTmux: boolean): string {
 	return kitty(`a=d,d=I,i=${imageId},q=2;`, inTmux);
 }
@@ -324,11 +330,12 @@ function mark(index: number): string {
 function rgb(code: 38 | 58, value: number): string {
 	return `${ESC}[${code};2;${(value >>> 16) & 255};${(value >>> 8) & 255};${value & 255}m`;
 }
-/** Kitty Unicode placeholder: foreground is image ID, underline is placement ID. */
+/** Build one Kitty Unicode cell; foreground identifies the image and underline identifies the placement. */
 export function cell(column: number, row: number, imageId: number): string {
 	const high = imageId >>> 24;
 	return `${rgb(38, imageId & 0xffffff)}${rgb(58, imageId & 0xffffff || 1)}${GLYPH}${mark(row)}${mark(column)}${high ? mark(high) : ""}${ESC}[39;59m`;
 }
+/** Build a row-major placeholder grid for one virtual placement. */
 export function grid(columns: number, rows: number, imageId: number): string[] {
 	return Array.from({ length: rows }, (_, row) =>
 		Array.from({ length: columns }, (_, column) => cell(column, row, imageId)).join(""),

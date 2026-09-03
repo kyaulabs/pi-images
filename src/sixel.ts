@@ -1,9 +1,11 @@
+/** Unpremultiplied RGBA pixels in row-major order. */
 export interface RgbaImage {
   width: number;
   height: number;
   data: Uint8Array;
 }
 
+/** Integer source rectangle measured in pixels. */
 export interface CropRect {
   x: number;
   y: number;
@@ -11,6 +13,7 @@ export interface CropRect {
   height: number;
 }
 
+/** Palette and alpha controls for SIXEL encoding. */
 export interface SixelEncodeOptions {
   maxColors?: number;
   transparentAlpha?: number;
@@ -23,6 +26,7 @@ function clampInteger(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, Math.floor(value)));
 }
 
+/** Clamp a partial source rectangle to valid image bounds. */
 export function normalizeCrop(image: RgbaImage, crop?: Partial<CropRect>): CropRect {
   const x = clampInteger(crop?.x ?? 0, 0, Math.max(0, image.width - 1));
   const y = clampInteger(crop?.y ?? 0, 0, Math.max(0, image.height - 1));
