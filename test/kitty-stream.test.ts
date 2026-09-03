@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { PNG } from "pngjs";
 
-import { KittyStreamTranslator } from "../src/kitty-stream.js";
+import { KittyStreamTranslator, type TranslationMode } from "../src/kitty-stream.js";
 
 function testPngBase64(): string {
   const png = new PNG({ width: 2, height: 1 });
@@ -14,9 +14,10 @@ function testPngBase64(): string {
   return PNG.sync.write(png).toString("base64");
 }
 
-function createTranslator(): KittyStreamTranslator {
+function createTranslator(mode: TranslationMode = "sixel"): KittyStreamTranslator {
   return new KittyStreamTranslator({
     getCellDimensions: () => ({ widthPx: 2, heightPx: 4 }),
+    mode,
     maxColors: 16,
   });
 }
@@ -82,4 +83,29 @@ test("forgets specifically deleted image sources", () => {
 
   assert.equal(placement.length, 0);
   assert.equal(translator.stats.sourceImages, 0);
+});
+
+test("uses tmux passthrough and Unicode cells in Kitty placeholder mode", () => {
+  const translator = createTranslator("kitty-placeholder");
+  const kitty = `\x1b_Ga=T,f=100,q=2,C=1,c=2,r=2,i=42;${testPngBase64()}\x1b\\`;
+  const output = translator.push(Buffer.from(kitty)).toString("utf8");
+
+  assert.ok(output.startsWith("\x1bPtmux;"));
+  assert.match(output, /a=t,f=100,i=42,q=2,m=0/);
+  assert.match(output, /a=p,i=42,p=42,U=1,c=2,r=2,q=2/);
+  assert.equal(output.split("\u{10eeee}").length - 1, 4);
+  assert.ok(output.endsWith("\x1b[1A\r\x1b[?7h"));
+  assert.equal(translator.stats.transmissions, 1);
+  assert.equal(translator.stats.conversionFailures, 0);
+});
+
+test("passes Kitty deletion commands through in placeholder mode", () => {
+  const translator = createTranslator("kitty-placeholder");
+  const deletion = translator
+    .push(Buffer.from("\x1b_Ga=d,d=A,q=2\x1b\\"))
+    .toString("ascii");
+
+  assert.ok(deletion.startsWith("\x1bPtmux;"));
+  assert.ok(deletion.includes("a=d,d=A,q=2"));
+  assert.ok(deletion.endsWith("\x1b\\"));
 });

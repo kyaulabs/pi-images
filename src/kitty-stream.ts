@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 
 import { decodeImage } from "./images.js";
+import {
+  grid as placeholderGrid,
+  placement as placeholderPlacement,
+  tmux as wrapForTmux,
+  upload as placeholderUpload,
+} from "./kitty-placeholder.js";
 import { encodeSixel, normalizeCrop, resizeToFit, type CropRect, type RgbaImage } from "./sixel.js";
 
 const KITTY_PREFIX = Buffer.from("\x1b_G", "ascii");
@@ -17,8 +23,11 @@ export interface CellDimensions {
   heightPx: number;
 }
 
+export type TranslationMode = "sixel" | "kitty-placeholder";
+
 export interface TranslatorOptions {
   getCellDimensions: () => CellDimensions;
+  mode?: TranslationMode;
   maxColors?: number;
 }
 
@@ -113,10 +122,12 @@ export class KittyStreamTranslator {
   private readonly renderCache = new Map<string, CachedRender>();
   private renderCacheBytes = 0;
   private readonly getCellDimensions: () => CellDimensions;
+  private readonly mode: TranslationMode;
   private readonly maxColors: number;
 
   constructor(options: TranslatorOptions) {
     this.getCellDimensions = options.getCellDimensions;
+    this.mode = options.mode ?? "sixel";
     this.maxColors = Math.max(2, Math.min(254, Math.floor(options.maxColors ?? 128)));
   }
 
@@ -176,7 +187,7 @@ export class KittyStreamTranslator {
       this.stats.placements += 1;
       return this.renderPlacement(controls);
     }
-    if (action === "d") this.handleDeletion(controls);
+    if (action === "d") return this.handleDeletion(sequence, controls);
     return Buffer.alloc(0);
   }
 
@@ -239,6 +250,16 @@ export class KittyStreamTranslator {
     }
     this.stats.transmissions += 1;
     this.updateCacheStats();
+
+    if (this.mode === "kitty-placeholder") {
+      const format = positiveControl(transmission.controls, "f") ?? 100;
+      const upload = Buffer.from(
+        placeholderUpload(encoded.toString("base64"), imageId, format, true).join(""),
+        "utf8",
+      );
+      return Buffer.concat([upload, this.renderPlacement(transmission.controls)]);
+    }
+
     return this.renderPlacement(transmission.controls);
   }
 
@@ -252,6 +273,24 @@ export class KittyStreamTranslator {
     if (!source) return Buffer.alloc(0);
     this.sources.delete(imageId);
     this.sources.set(imageId, source);
+
+    if (this.mode === "kitty-placeholder") {
+      try {
+        const placement = placeholderPlacement(imageId, columns, rows, true, {
+          x: integerControl(controls, "x"),
+          y: integerControl(controls, "y"),
+          width: positiveControl(controls, "w"),
+          height: positiveControl(controls, "h"),
+        });
+        const lines = placeholderGrid(columns, rows, imageId);
+        const cursorUp = rows > 1 ? `\x1b[${rows - 1}A` : "";
+        const grid = `\x1b[?7l${lines.join("\r\n")}${cursorUp}\r\x1b[?7h`;
+        return Buffer.from(`${placement}${grid}`, "utf8");
+      } catch {
+        this.stats.conversionFailures += 1;
+        return Buffer.alloc(0);
+      }
+    }
 
     source.decoded ??= decodeImage(source.encoded);
     if (!source.decoded) {
@@ -298,13 +337,17 @@ export class KittyStreamTranslator {
     }
   }
 
-  private handleDeletion(controls: Controls): void {
+  private handleDeletion(sequence: Buffer, controls: Controls): Buffer {
     const selector = controls.get("d");
     const imageId = positiveControl(controls, "i");
     if ((selector === "i" || selector === "I") && imageId !== undefined) {
       this.sources.delete(imageId);
       this.updateCacheStats();
     }
+
+    if (this.mode !== "kitty-placeholder") return Buffer.alloc(0);
+    const kittySequence = `\x1b_G${sequence.toString("ascii")}\x1b\\`;
+    return Buffer.from(wrapForTmux(kittySequence), "utf8");
   }
 
   private addCachedRender(key: string, data: Buffer): void {
