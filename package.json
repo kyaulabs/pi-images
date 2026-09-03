@@ -25,7 +25,8 @@
     "src",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "pi-images.tmux"
   ],
   "pi": {
     "extensions": [
@@ -33,8 +34,9 @@
     ]
   },
   "scripts": {
-    "check": "npm run typecheck && npm test",
+    "check": "npm run typecheck && npm run lint:tmux && npm test",
     "hooks:install": "git config core.hooksPath .github/hooks && chmod +x .github/hooks/commit-msg .github/hooks/pre-commit",
+    "lint:tmux": "shellcheck pi-images.tmux",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
