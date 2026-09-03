@@ -1,0 +1,61 @@
+{
+  "name": "@kyaulabs/pi-sixel",
+  "version": "0.1.0",
+  "description": "SIXEL image bridge for Pi sessions running inside tmux",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "author": "KYAU Labs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kyaulabs/pi-sixel.git"
+  },
+  "homepage": "https://github.com/kyaulabs/pi-sixel#readme",
+  "bugs": {
+    "url": "https://github.com/kyaulabs/pi-sixel/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "sixel",
+    "tmux",
+    "terminal-images"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "scripts": {
+    "check": "npm run typecheck && npm test",
+    "hooks:install": "git config core.hooksPath .github/hooks && chmod +x .github/hooks/commit-msg .github/hooks/pre-commit",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "@earendil-works/pi-coding-agent": "^0.84.4",
+    "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

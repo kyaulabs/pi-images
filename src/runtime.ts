@@ -1,0 +1,202 @@
+import { spawnSync } from "node:child_process";
+
+import { KittyStreamTranslator, type CellDimensions, type TranslatorStats } from "./kitty-stream.js";
+
+const BRIDGE_SYMBOL = Symbol.for("kyaulabs.pi-sixel.bridge");
+const DEFAULT_CELL_DIMENSIONS: CellDimensions = { widthPx: 9, heightPx: 18 };
+const CELL_QUERY_INTERVAL_MS = 2_000;
+
+interface ActivationResult {
+  active: boolean;
+  reason: string;
+  clientTermfeatures?: string;
+}
+
+interface GlobalBridge {
+  users: number;
+  translator: KittyStreamTranslator;
+  uninstall: () => void;
+}
+
+export interface BridgeHandle {
+  active: boolean;
+  reason: string;
+  stats?: TranslatorStats;
+  release: () => void;
+}
+
+function parsePositiveInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return parsed > 0 ? parsed : undefined;
+}
+
+export function parseTerminalSize(value: string): CellDimensions | undefined {
+  const match = /^(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/.exec(value.trim());
+  if (!match) return undefined;
+  const rows = Number.parseInt(match[1]!, 10);
+  const columns = Number.parseInt(match[2]!, 10);
+  const widthPx = Number.parseInt(match[3]!, 10);
+  const heightPx = Number.parseInt(match[4]!, 10);
+  if (rows < 1 || columns < 1 || widthPx < columns || heightPx < rows) return undefined;
+  const cellWidth = Math.round(widthPx / columns);
+  const cellHeight = Math.round(heightPx / rows);
+  if (cellWidth < 1 || cellWidth > 100 || cellHeight < 1 || cellHeight > 200) return undefined;
+  return { widthPx: cellWidth, heightPx: cellHeight };
+}
+
+function queryTerminalCellDimensions(): CellDimensions | undefined {
+  const configuredWidth = parsePositiveInteger(process.env.PI_SIXEL_CELL_WIDTH);
+  const configuredHeight = parsePositiveInteger(process.env.PI_SIXEL_CELL_HEIGHT);
+  if (configuredWidth && configuredHeight) {
+    return { widthPx: configuredWidth, heightPx: configuredHeight };
+  }
+
+  const script = [
+    "import fcntl, struct, termios",
+    "with open('/dev/tty', 'rb', buffering=0) as tty:",
+    " print(*struct.unpack('HHHH', fcntl.ioctl(tty, termios.TIOCGWINSZ, b'\\0' * 8)))",
+  ].join("\n");
+  const result = spawnSync("python3", ["-c", script], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 750,
+  });
+  return result.status === 0 ? parseTerminalSize(result.stdout) : undefined;
+}
+
+export function createCellDimensionProvider(): () => CellDimensions {
+  let cached = queryTerminalCellDimensions() ?? DEFAULT_CELL_DIMENSIONS;
+  let queriedAt = Date.now();
+  return () => {
+    if (Date.now() - queriedAt >= CELL_QUERY_INTERVAL_MS) {
+      cached = queryTerminalCellDimensions() ?? cached;
+      queriedAt = Date.now();
+    }
+    return cached;
+  };
+}
+
+function detectActivation(): ActivationResult {
+  if (process.env.PI_SIXEL === "0" || process.env.PI_SIXEL === "off") {
+    return { active: false, reason: "disabled by PI_SIXEL" };
+  }
+  if (!process.env.TMUX) return { active: false, reason: "not running in tmux" };
+  if (!process.stdout.isTTY) return { active: false, reason: "stdout is not a terminal" };
+
+  const requestedProtocol = process.env.PI_IMAGE_PROTOCOL?.toLowerCase();
+  if (requestedProtocol === "none" || requestedProtocol === "0" || requestedProtocol === "iterm2") {
+    return { active: false, reason: `PI_IMAGE_PROTOCOL=${requestedProtocol}` };
+  }
+  if (process.env.PI_SIXEL === "1" || process.env.PI_SIXEL === "force") {
+    return { active: true, reason: "forced by PI_SIXEL" };
+  }
+
+  const result = spawnSync(
+    "tmux",
+    ["display-message", "-p", "#{sixel_support}|#{client_termfeatures}|#{client_termname}"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 750 },
+  );
+  if (result.status !== 0) return { active: false, reason: "unable to query tmux" };
+  const [compiledSupport, features = "", terminalName = "unknown"] = result.stdout.trim().split("|");
+  if (compiledSupport !== "1") return { active: false, reason: "tmux was built without SIXEL support" };
+  if (!features.split(",").includes("sixel")) {
+    return {
+      active: false,
+      reason: `${terminalName} is not marked with the tmux sixel feature`,
+      clientTermfeatures: features,
+    };
+  }
+  return { active: true, reason: `tmux client ${terminalName} supports SIXEL`, clientTermfeatures: features };
+}
+
+function toBuffer(chunk: string | Uint8Array, encoding?: BufferEncoding): Buffer {
+  if (typeof chunk === "string") return Buffer.from(chunk, encoding ?? "utf8");
+  return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+}
+
+function installBridge(): GlobalBridge {
+  const existing = (globalThis as Record<symbol, unknown>)[BRIDGE_SYMBOL] as GlobalBridge | undefined;
+  if (existing) {
+    existing.users += 1;
+    return existing;
+  }
+
+  const maxColors = parsePositiveInteger(process.env.PI_SIXEL_COLORS);
+  const translator = new KittyStreamTranslator({
+    getCellDimensions: createCellDimensionProvider(),
+    maxColors,
+  });
+  const originalWrite = process.stdout.write;
+  const writeBuffer = originalWrite as unknown as (
+    this: NodeJS.WriteStream,
+    chunk: Uint8Array,
+    callback?: (error?: Error | null) => void,
+  ) => boolean;
+
+  const patchedWrite = function (
+    this: NodeJS.WriteStream,
+    chunk: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean {
+    const encoding = typeof encodingOrCallback === "string" ? encodingOrCallback : undefined;
+    const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
+    const output = translator.push(toBuffer(chunk, encoding));
+    if (output.length > 0) return writeBuffer.call(this, output, done);
+    if (done) queueMicrotask(() => done(null));
+    return true;
+  };
+
+  process.stdout.write = patchedWrite as typeof process.stdout.write;
+  const bridge: GlobalBridge = {
+    users: 1,
+    translator,
+    uninstall: () => {
+      if (process.stdout.write === patchedWrite) process.stdout.write = originalWrite;
+      translator.reset();
+      delete (globalThis as Record<symbol, unknown>)[BRIDGE_SYMBOL];
+    },
+  };
+  (globalThis as Record<symbol, unknown>)[BRIDGE_SYMBOL] = bridge;
+  return bridge;
+}
+
+export function acquireBridge(): BridgeHandle {
+  const activation = detectActivation();
+  if (!activation.active) {
+    return { active: false, reason: activation.reason, release: () => {} };
+  }
+
+  // Pi has no SIXEL backend. Make its image components produce chunked PNG via
+  // Kitty, then translate those terminal bytes before tmux receives them.
+  process.env.PI_IMAGE_PROTOCOL = "kitty";
+  const bridge = installBridge();
+  let released = false;
+  return {
+    active: true,
+    reason: activation.reason,
+    stats: bridge.translator.stats,
+    release: () => {
+      if (released) return;
+      released = true;
+      bridge.users -= 1;
+      if (bridge.users <= 0) bridge.uninstall();
+    },
+  };
+}
+
+export function formatBridgeStatus(handle: BridgeHandle): string {
+  if (!handle.active || !handle.stats) return `pi-sixel: inactive (${handle.reason})`;
+  const stats = handle.stats;
+  return [
+    `pi-sixel: active (${handle.reason})`,
+    `transmissions: ${stats.transmissions}`,
+    `placements: ${stats.placements}`,
+    `cache: ${stats.cacheHits} hits / ${stats.cacheMisses} misses`,
+    `sources: ${stats.sourceImages}`,
+    `render cache: ${stats.cachedRenders} entries / ${Math.round(stats.cachedRenderBytes / 1024)} KiB`,
+    `conversion failures: ${stats.conversionFailures}`,
+    `dropped input: ${stats.droppedBytes} bytes`,
+  ].join("\n");
+}
