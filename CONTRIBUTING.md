@@ -44,7 +44,7 @@ npm install
 npm run hooks:install
 ```
 
-`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation.
+`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs Gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation. CI also runs Gitleaks with the organization-provided license.
 
 ## Make a change
 
@@ -66,7 +66,7 @@ npm run check
 npm pack --dry-run
 ```
 
-Changes to `pi-images.tmux` must pass ShellCheck. Changes to terminal protocols also need a visual test in each affected path:
+`npm run check` runs strict TypeScript validation, type-aware ESLint, ShellCheck, and tests with greater-than-95% line, branch, and function coverage thresholds. Changes to terminal protocols also need a visual test in each affected path:
 
 - Ghostty Kitty placeholders inside tmux
 - SIXEL inside tmux, when the change affects SIXEL
@@ -101,6 +101,30 @@ Keep unrelated changes in separate pull requests. Update tests and documentation
 Open an issue with the repository templates at [GitHub Issues](/../../issues). Image bugs need `/images-status` output and enough environment detail to identify the selected protocol path.
 
 Do not attach sensitive images, terminal logs containing image payloads, credentials, or private session content.
+
+## Release process
+
+Create `release/X.Y.Z` from `develop`, then set the package version without creating a local tag:
+
+```sh
+git switch -c release/X.Y.Z develop
+npm version X.Y.Z --no-git-tag-version
+npm run check
+npm pack --dry-run
+```
+
+Commit the resulting `package.json` and `package-lock.json` changes and open a pull request into `main`. When that pull request is merged, the release workflow:
+
+1. verifies that both package files match `X.Y.Z`;
+2. runs the package checks and builds the npm tarball;
+3. creates and pushes the `vX.Y.Z` tag;
+4. publishes the package to GitHub Packages;
+5. creates a GitHub release with git-cliff notes and the npm tarball; and
+6. opens a pull request from `main` back into `develop`.
+
+The tarball attached to the GitHub release is ready for a separate manual npmjs.com publication. The workflow does not publish to npmjs.com.
+
+Repository Actions settings must allow read and write workflow permissions and permit GitHub Actions to create pull requests. Optionally add a fine-grained `BACKMERGE_TOKEN` secret with repository contents read and pull-request write access. Using that token allows the back-merge pull request to trigger normal pull-request workflows; pull requests created with the default `GITHUB_TOKEN` do not trigger additional workflow runs.
 
 ## License
 

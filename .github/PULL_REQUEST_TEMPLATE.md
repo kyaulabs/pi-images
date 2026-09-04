@@ -1,42 +1,89 @@
-## Summary
+<!--
+  This template helps you structure your PR description.
+  Replace the placeholder text (in angle brackets like <...>)
+  with your own details. Comments like this one are hidden
+  from the final PR description.
+-->
 
-Describe the change and its user-visible result.
+## 📋 Summary
 
-## Problem and mechanism
+<!--
+  Briefly describe what this PR does and why.
+  Aim for 2–5 sentences that capture the essence of the change.
+  Example:
+  "Three intertwined changes that together eliminate documentary-only conventions
+  in the harness and replace them with mechanical enforcement + runtime resolution:
+  1. Git Flow branch naming is now enforced...
+  2. Signed-off-by is now resolved dynamically...
+  3. Two config files consolidated into the pi settings layer..."
+-->
 
-Explain the observed problem and the parser, protocol, terminal, or tmux behavior that caused it.
+## 📦 Changes by Phase
 
-## Implementation
+<!--
+  Group your changes logically, often by feature area or phase.
+  List new files, modified files, deleted files, and tests per group.
+  Use bullet points or subheadings. Example structure:
+  ### Phase A — Branch naming enforcement
+  - New: `script.sh`, `test.sh`
+  - Modified: `hook`, `docs`
+  - Tests: `suite` (X cases)
+-->
 
-Describe the chosen approach and any compatibility or resource-limit decisions.
+## 📜 ADRs
 
-## Validation
+<!--
+  List any Architecture Decision Records that are new, amended, or superseded.
+  Use a table or bullet list. Example:
+  | ADR | Action |
+  |-----|--------|
+  | 0028 (new) | Git Flow branch naming — Accepted |
+  | 0007 | Partially superseded by 0029 |
+-->
 
-List the commands and real-terminal checks performed.
+## ✅ Verification
 
-```text
-npm run check
-npm pack --dry-run
-```
+<!--
+  Summarize how you validated the changes.
+  Include results from automated checks (linters, tests, coverage)
+  and any manual verification steps.
+  Example:
+  | Gate | Result |
+  |------|--------|
+  | /check PHP CS Fixer | PASS |
+  | Pest --coverage | 290 passed / 1 environmental fail |
+  | @code-review | GO |
+-->
 
-For rendering changes, include the tested Pi, tmux, outer-terminal, TUI-mode, and `pi-images` output mode combinations.
+## 🏗️ Architect Conditions (if applicable)
 
-## References
+<!--
+  If this PR was pre‑validated by an architect (e.g., via @architect),
+  list each condition and how it was addressed.
+  Example:
+  1. ✅ jq dependency: graceful degradation + /doctor check
+  2. ✅ v1→v4 schema migration: idempotent migrate script
+  Leave blank or delete this section if not applicable.
+-->
 
-Link related issues, protocol documentation, or upstream changes.
+## 📝 Commits (<# total>)
 
-## Checklist
+<!--
+  Optionally list the commit SHAs and subjects, or just mention the count.
+  Example:
+  Atomic, conventional‑commits‑formatted, signed.
+  Total: 17 commits (list them if helpful)
+-->
 
-- [ ] I branched from the current `develop` branch.
-- [ ] I kept unrelated changes out of this pull request.
-- [ ] I added or updated regression tests for behavior changes.
-- [ ] I updated public documentation for changed setup or behavior.
-- [ ] `npm run check` passes locally.
-- [ ] `npm pack --dry-run` contains only intended release files.
-- [ ] gitleaks reports no secrets.
-- [ ] I completed the relevant visual tmux tests, or this change does not affect rendering.
-- [ ] My commits follow Conventional Commits.
+## 🧪 Test Plan
 
-## Additional context
-
-Add migration notes, screenshots without sensitive data, or follow-up work that reviewers need.
+<!--
+  Provide a clear, step‑by‑step list of commands or actions
+  a reviewer can run to verify your changes work as expected.
+  Use bullet points with code blocks if needed.
+  Example:
+  - [ ] `pi --list-models` — model catalogue lists your providers
+  - [ ] `bash packages/prism-core/scripts/new-branch.sh feat test-branch` — creates correct branch
+  - [ ] `bash packages/prism-core/scripts/validate-branch-name.sh feat/your-name-hash-desc` — exit 0
+  - [ ] `bash packages/prism-core/scripts/resolve-identity.sh` — prints your identity
+-->

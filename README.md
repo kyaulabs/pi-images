@@ -259,9 +259,9 @@ npm run check
 npm pack --dry-run
 ```
 
-The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). It scans the checkout and runs the TypeScript and test checks. The commit-message hook runs the project-local Commitlint binary. CI repeats package checks and commit-message validation. `shellcheck pi-images.tmux` verifies the TPM entry point.
+The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). It scans the checkout and runs the shared package checks. Those checks include strict TypeScript validation, type-aware ESLint analysis, ShellCheck for `pi-images.tmux`, and the test suite. The commit-message hook runs the project-local Commitlint binary. CI repeats all package and commit-message checks and runs Gitleaks against repository history.
 
-The test suite covers SIXEL encoding, Kitty chunk reassembly, byte-level stream boundaries, virtual placements, deletion, cache behavior, and terminal-size parsing. Protocol changes also require a visual test in the affected terminal and tmux combination.
+The test suite covers image decoding, SIXEL encoding, Kitty chunk reassembly, byte-level stream boundaries, virtual placements, deletion, cache behavior, activation, output interception, and terminal-size parsing. Node's test coverage must remain above 95% for lines, branches, and functions. Protocol changes also require a visual test in the affected terminal and tmux combination.
 
 ## Limitations
 

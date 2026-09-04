@@ -19,7 +19,7 @@ export default function piImages(pi: ExtensionAPI): void {
     handler: showStatus,
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", () => {
     bridge.release();
   });
 }
