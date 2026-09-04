@@ -102,6 +102,30 @@ Open an issue with the repository templates at [GitHub Issues](/../../issues). I
 
 Do not attach sensitive images, terminal logs containing image payloads, credentials, or private session content.
 
+## Release process
+
+Create `release/X.Y.Z` from `develop`, then set the package version without creating a local tag:
+
+```sh
+git switch -c release/X.Y.Z develop
+npm version X.Y.Z --no-git-tag-version
+npm run check
+npm pack --dry-run
+```
+
+Commit the resulting `package.json` and `package-lock.json` changes and open a pull request into `main`. When that pull request is merged, the release workflow:
+
+1. verifies that both package files match `X.Y.Z`;
+2. runs the package checks and builds the npm tarball;
+3. creates and pushes the `vX.Y.Z` tag;
+4. publishes the package to GitHub Packages;
+5. creates a GitHub release with git-cliff notes and the npm tarball; and
+6. opens a pull request from `main` back into `develop`.
+
+The tarball attached to the GitHub release is ready for a separate manual npmjs.com publication. The workflow does not publish to npmjs.com.
+
+Repository Actions settings must allow read and write workflow permissions and permit GitHub Actions to create pull requests. Optionally add a fine-grained `BACKMERGE_TOKEN` secret with repository contents read and pull-request write access. Using that token allows the back-merge pull request to trigger normal pull-request workflows; pull requests created with the default `GITHUB_TOKEN` do not trigger additional workflow runs.
+
 ## License
 
 Contributions are submitted under the project's [GNU Affero General Public License v3.0](LICENSE). Do not submit code that cannot be distributed under that license. Preserve third-party notices and compatible license text when adapting existing work.
