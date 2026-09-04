@@ -370,7 +370,7 @@ export class KittyStreamTranslator {
     this.renderCacheBytes += entry.bytes;
 
     while (this.renderCache.size > MAX_CACHE_ENTRIES || this.renderCacheBytes > MAX_CACHE_BYTES) {
-      const oldestKey = this.renderCache.keys().next().value as string | undefined;
+      const oldestKey = this.renderCache.keys().next().value;
       if (oldestKey === undefined) break;
       const oldest = this.renderCache.get(oldestKey);
       this.renderCache.delete(oldestKey);
@@ -381,7 +381,7 @@ export class KittyStreamTranslator {
 
   private evictSources(): void {
     while (this.sources.size > 64) {
-      const oldestId = this.sources.keys().next().value as number | undefined;
+      const oldestId = this.sources.keys().next().value;
       if (oldestId === undefined) break;
       this.sources.delete(oldestId);
     }

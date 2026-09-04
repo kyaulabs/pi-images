@@ -34,8 +34,9 @@
     ]
   },
   "scripts": {
-    "check": "npm run typecheck && npm run lint:tmux && npm test",
+    "check": "npm run typecheck && npm run lint && npm run lint:tmux && npm test",
     "hooks:install": "git config core.hooksPath .github/hooks && chmod +x .github/hooks/commit-msg .github/hooks/pre-commit",
+    "lint": "eslint .",
     "lint:tmux": "shellcheck pi-images.tmux",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
@@ -51,10 +52,14 @@
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "@earendil-works/pi-coding-agent": "^0.84.4",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "@types/pngjs": "^6.0.5",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.69.0"
   },
   "engines": {
     "node": ">=22"
