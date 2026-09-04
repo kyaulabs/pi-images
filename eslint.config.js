@@ -34,4 +34,10 @@ export default tseslint.config(
       "no-control-regex": "off",
     },
   },
+  {
+    files: ["test/index.test.ts", "test/runtime.test.ts"],
+    rules: {
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
 );

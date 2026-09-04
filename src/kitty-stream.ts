@@ -32,6 +32,8 @@ export interface TranslatorOptions {
   getCellDimensions: () => CellDimensions;
   mode?: TranslationMode;
   maxColors?: number;
+  /** Optionally lower the hard transmission limit for a constrained caller. */
+  maxTransmissionBytes?: number;
 }
 
 /** Mutable counters exposed by the `/images-status` command. */
@@ -133,11 +135,16 @@ export class KittyStreamTranslator {
   private readonly getCellDimensions: () => CellDimensions;
   private readonly mode: TranslationMode;
   private readonly maxColors: number;
+  private readonly maxTransmissionBytes: number;
 
   constructor(options: TranslatorOptions) {
     this.getCellDimensions = options.getCellDimensions;
     this.mode = options.mode ?? "sixel";
     this.maxColors = Math.max(2, Math.min(254, Math.floor(options.maxColors ?? 128)));
+    this.maxTransmissionBytes = Math.max(
+      1,
+      Math.min(MAX_BASE64_BYTES, Math.floor(options.maxTransmissionBytes ?? MAX_BASE64_BYTES)),
+    );
   }
 
   /** Consume one terminal-output chunk and return bytes that are safe to write. */
@@ -208,7 +215,7 @@ export class KittyStreamTranslator {
       payload: [payload],
       bytes: Buffer.byteLength(payload, "ascii"),
     };
-    if (this.transmission.bytes > MAX_BASE64_BYTES) {
+    if (this.transmission.bytes > this.maxTransmissionBytes) {
       this.stats.droppedBytes += this.transmission.bytes;
       this.transmission = undefined;
       return Buffer.alloc(0);
@@ -221,7 +228,7 @@ export class KittyStreamTranslator {
     if (!transmission) return Buffer.alloc(0);
     transmission.payload.push(payload);
     transmission.bytes += Buffer.byteLength(payload, "ascii");
-    if (transmission.bytes > MAX_BASE64_BYTES) {
+    if (transmission.bytes > this.maxTransmissionBytes) {
       this.stats.droppedBytes += transmission.bytes;
       this.transmission = undefined;
       return Buffer.alloc(0);
@@ -240,13 +247,7 @@ export class KittyStreamTranslator {
       return Buffer.alloc(0);
     }
 
-    let encoded: Buffer;
-    try {
-      encoded = Buffer.from(transmission.payload.join(""), "base64");
-    } catch {
-      this.stats.conversionFailures += 1;
-      return Buffer.alloc(0);
-    }
+    const encoded = Buffer.from(transmission.payload.join(""), "base64");
     if (encoded.length === 0) {
       this.stats.conversionFailures += 1;
       return Buffer.alloc(0);
@@ -309,35 +310,35 @@ export class KittyStreamTranslator {
       return Buffer.alloc(0);
     }
 
-    const cell = this.getCellDimensions();
-    const crop = sourceCrop(controls, source.decoded);
-    const targetWidth = Math.max(1, columns * cell.widthPx);
-    const targetHeight = Math.max(1, rows * cell.heightPx);
-    if (targetWidth * targetHeight > MAX_TARGET_PIXELS) {
-      this.stats.conversionFailures += 1;
-      return Buffer.alloc(0);
-    }
-
-    const cacheKey = [
-      source.hash,
-      crop.x,
-      crop.y,
-      crop.width,
-      crop.height,
-      targetWidth,
-      targetHeight,
-      this.maxColors,
-    ].join(":");
-    const cached = this.renderCache.get(cacheKey);
-    if (cached) {
-      this.renderCache.delete(cacheKey);
-      this.renderCache.set(cacheKey, cached);
-      this.stats.cacheHits += 1;
-      return Buffer.concat([CURSOR_SAVE, cached.data, CURSOR_RESTORE]);
-    }
-
-    this.stats.cacheMisses += 1;
     try {
+      const cell = this.getCellDimensions();
+      const crop = sourceCrop(controls, source.decoded);
+      const targetWidth = Math.max(1, columns * cell.widthPx);
+      const targetHeight = Math.max(1, rows * cell.heightPx);
+      if (targetWidth * targetHeight > MAX_TARGET_PIXELS) {
+        this.stats.conversionFailures += 1;
+        return Buffer.alloc(0);
+      }
+
+      const cacheKey = [
+        source.hash,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        targetWidth,
+        targetHeight,
+        this.maxColors,
+      ].join(":");
+      const cached = this.renderCache.get(cacheKey);
+      if (cached) {
+        this.renderCache.delete(cacheKey);
+        this.renderCache.set(cacheKey, cached);
+        this.stats.cacheHits += 1;
+        return Buffer.concat([CURSOR_SAVE, cached.data, CURSOR_RESTORE]);
+      }
+
+      this.stats.cacheMisses += 1;
       const resized = resizeToFit(source.decoded, targetWidth, targetHeight, crop);
       const sixel = encodeSixel(resized, { maxColors: this.maxColors });
       this.addCachedRender(cacheKey, sixel);

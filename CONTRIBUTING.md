@@ -44,7 +44,7 @@ npm install
 npm run hooks:install
 ```
 
-`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation.
+`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs Gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation. CI also runs Gitleaks with the organization-provided license.
 
 ## Make a change
 
@@ -66,7 +66,7 @@ npm run check
 npm pack --dry-run
 ```
 
-Changes to `pi-images.tmux` must pass ShellCheck. Changes to terminal protocols also need a visual test in each affected path:
+`npm run check` runs strict TypeScript validation, type-aware ESLint, ShellCheck, and tests with greater-than-95% line, branch, and function coverage thresholds. Changes to terminal protocols also need a visual test in each affected path:
 
 - Ghostty Kitty placeholders inside tmux
 - SIXEL inside tmux, when the change affects SIXEL
