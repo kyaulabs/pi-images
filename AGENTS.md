@@ -85,18 +85,49 @@ gh pr merge N --merge --match-head-commit FULL_REVIEWED_HEAD_SHA \
   the tag and GitHub Release with git-cliff notes and the tarball asset, and opens
   a `main` → `develop` back-merge PR. Watch the release workflow to completion and
   verify the tag's commit and release asset before reporting success.
-- The organization `BOT_TOKEN` opens back-merge PRs as the bot so CI runs normally.
-  `GITHUB_TOKEN` is the fallback and does not trigger PR CI; if used, close/reopen
-  the PR as a maintainer. Keep `GITLEAKS_LICENSE` available. Do not print secrets.
+- Use the dedicated organization `BACKMERGE_TOKEN` secret for back-merge PRs.
+  Its fine-grained token must be owned by `kyaulabs-bot`, use `kyaulabs` as resource
+  owner, cover **all kyaulabs repositories**, and grant Contents read plus Pull
+  requests read/write. The organization secret must also be visible to all repos.
+  The maintainer explicitly requires **No expiration**. Confirm organization
+  approval; if policy prevents a non-expiring token, ask the maintainer instead of
+  choosing an expiry or relaxing policy. Revoke/replace compromised credentials.
+  Do not repurpose or overwrite the unrelated `BOT_TOKEN` secret. GitHub requires token
+  creation in the bot account's settings; do not claim `gh` can create a new PAT.
+  Never print tokens or ask the user to paste them into chat.
+- Bot-token PRs trigger CI normally. `GITHUB_TOKEN` is the fallback and does not
+  trigger PR CI; if used, close/reopen the PR as a maintainer. Keep the organization
+  `GITLEAKS_LICENSE` secret available.
 - Review and merge the back-merge PR after checks. Verify `develop` contains the
   release commit, synchronize the local checkout, and leave a clean working tree.
 - For partial failures, use the documented rerun/manual-dispatch recovery with the
   same version and full release merge SHA on `main`. Do not overwrite mismatched
   tags or package contents, republish a different tarball under the same version,
-  or bypass the reviewed release flow.
+  or bypass the reviewed release flow. A rerun uses the original workflow revision;
+  if workflow code needs repair, merge the fix into `develop` and then `main` via
+  reviewed maintenance PRs with a non-`release/` head. Dispatch the corrected
+  workflow on `main` using the original release merge SHA, preserving its tag and
+  tarball. Do not accidentally trigger a new release for automation-only recovery.
 - npmjs.com publication remains a manual maintainer action. Do not publish there
   or add an npm publishing token to Actions. Give the maintainer the command to
   publish the exact GitHub release tarball, rather than rebuilding it.
+
+## Recorded v0.1.0 back-merge recovery
+
+- Release PR #3 merged as `f6ebd4ef6bb102bbbfc5115c8e172fb064943351`.
+  Release run `34051828667` successfully published GitHub Packages and created
+  `v0.1.0` with its tarball, then failed to create the back-merge PR with
+  `Resource not accessible by personal access token`.
+- The unrelated organization `BOT_TOKEN` was present but lacked the required PR
+  permission. Its presence did not prove suitability. `pi-widgets` used the
+  automatic `GITHUB_TOKEN`; switching to a PAT here was intended to trigger CI.
+- The maintainer requested a new, dedicated `BACKMERGE_TOKEN` owned by
+  `kyaulabs-bot` for automatic back-merge PRs across all kyaulabs repositories.
+  Leave `BOT_TOKEN` unchanged. Validate the new secret through the corrected
+  workflow before declaring recovery complete; never waive an authorization error.
+- For recovery, dispatch the corrected workflow with version `0.1.0` and the
+  original merge SHA above. Preserve the published tag and tarball, verify the
+  existing package integrity, and complete the reviewed back-merge into `develop`.
 
 ## Recorded v0.1.0 commit-message exception
 
