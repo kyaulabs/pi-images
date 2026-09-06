@@ -178,6 +178,8 @@ function installBridge(mode: TranslationMode): GlobalBridge {
     mode,
     maxColors,
   });
+  // The original method is restored verbatim and invoked with an explicit stream receiver.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const originalWrite = process.stdout.write;
   const writeBuffer = originalWrite as unknown as (
     this: NodeJS.WriteStream,
@@ -199,7 +201,7 @@ function installBridge(mode: TranslationMode): GlobalBridge {
     return true;
   };
 
-  process.stdout.write = patchedWrite as typeof process.stdout.write;
+  process.stdout.write = patchedWrite;
   const bridge: GlobalBridge = {
     users: 1,
     mode,

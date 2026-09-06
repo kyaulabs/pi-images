@@ -14,16 +14,16 @@ Name a work branch with this format:
 <type>/<github-user>-<random-id>-<description>
 ```
 
-Generate the four-character ID with:
+Generate the six-character ID with:
 
 ```sh
-openssl rand -hex 2
+openssl rand -hex 3
 ```
 
 For example:
 
 ```text
-fix/kyau-a0e7-placeholder-cropping
+fix/kyau-a0e7c2-placeholder-cropping
 ```
 
 Use a Conventional Commit type such as `feat`, `fix`, `docs`, `test`, `refactor`, or `ci` for `<type>`.
@@ -44,7 +44,7 @@ npm install
 npm run hooks:install
 ```
 
-`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation.
+`npm run hooks:install` sets this checkout's `core.hooksPath` to `.github/hooks`. The pre-commit hook runs Gitleaks and `npm run check`. The commit-message hook uses the local Commitlint installation. CI also runs Gitleaks with the organization-provided license.
 
 ## Make a change
 
@@ -66,7 +66,7 @@ npm run check
 npm pack --dry-run
 ```
 
-Changes to `pi-images.tmux` must pass ShellCheck. Changes to terminal protocols also need a visual test in each affected path:
+`npm run check` runs strict TypeScript validation, type-aware ESLint, ShellCheck, and tests with greater-than-95% line, branch, and function coverage thresholds. Changes to terminal protocols also need a visual test in each affected path:
 
 - Ghostty Kitty placeholders inside tmux
 - SIXEL inside tmux, when the change affects SIXEL
@@ -101,6 +101,14 @@ Keep unrelated changes in separate pull requests. Update tests and documentation
 Open an issue with the repository templates at [GitHub Issues](/../../issues). Image bugs need `/images-status` output and enough environment detail to identify the selected protocol path.
 
 Do not attach sensitive images, terminal logs containing image payloads, credentials, or private session content.
+
+## Release process
+
+Follow [RELEASING.md](RELEASING.md) for the protected `develop` → `release/X.Y.Z` → `main` flow, automated GitHub publication, recovery, and the back-merge into `develop`. Release branches are the exception to the work-branch naming convention above.
+
+Sign commits with `git commit -S`. The rulesets require signed commits and an approving review for pull requests into `develop` and `main`; releases merge into `main` with a merge commit. Do not bypass these protections.
+
+The release workflow publishes to GitHub Packages and attaches the same tarball to a GitHub Release. Only publication to npmjs.com remains manual.
 
 ## License
 

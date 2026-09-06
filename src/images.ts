@@ -18,7 +18,7 @@ export function decodeImage(data: Buffer): RgbaImage | undefined {
       return {
         width: decoded.width,
         height: decoded.height,
-        data: decoded.data as Uint8Array,
+        data: decoded.data,
       };
     }
   } catch {
