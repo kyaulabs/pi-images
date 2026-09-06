@@ -12,10 +12,18 @@ maintainer action.
 - Allow Actions to create pull requests. The release job explicitly requests contents,
   packages, and pull-request write permissions; CI has read-only contents access.
 - Make the organization `GITLEAKS_LICENSE` secret available to this repository.
-- Make `BOT_TOKEN` available for back-merge PRs, with repository contents read and
-  pull-request write access. Bot-created PRs trigger CI and can be reviewed by `kyau`.
-  Without it, the workflow falls back to `GITHUB_TOKEN`; those PRs do not trigger CI.
-  A maintainer must close and reopen such a PR to trigger the pull-request checks.
+- Create a fine-grained personal access token named `BACKMERGE_TOKEN` while signed
+  in as `kyaulabs-bot`. Select `kyaulabs` as resource owner, **All repositories**,
+  **Contents: Read-only**, **Pull requests: Read and write**, and **No expiration**.
+  Approve the token if required by organization policy. If policy prohibits a
+  non-expiring token, stop and ask the maintainer; do not silently choose an expiry
+  or relax organization policy. Revoke and replace the token if compromised.
+- Store it as the organization Actions secret `BACKMERGE_TOKEN`, also available to
+  **all repositories**. Both the token's repository access and the secret's repository
+  visibility must allow this repo. Do not repurpose the unrelated `BOT_TOKEN` secret.
+  Bot-created PRs trigger CI and can be reviewed by `kyau`. Without `BACKMERGE_TOKEN`,
+  the workflow falls back to `GITHUB_TOKEN`; those PRs do not trigger CI. A maintainer
+  must close and reopen such a PR to trigger the pull-request checks.
 - No npmjs.com token is needed in Actions. The workflow never publishes there.
 
 ## 1. Prepare a release branch
@@ -80,8 +88,18 @@ gh workflow run release.yml --ref main \
 If GitHub Packages returns an authorization error, check the workflow's package write
 permission and the package's repository access. Only a not-found response permits a new
 publication. If the back-merge PR fails to open, check Actions PR permissions and
-`BOT_TOKEN` access, then rerun the failed job. Missing back-merge CI usually means the
+`BACKMERGE_TOKEN` permissions, repository access, organization approval, and expiration,
+then rerun the failed job. `Resource not accessible by personal access token` means
+having a nonempty secret is not sufficient: verify that token's PR write permission.
+Missing back-merge CI usually means the
 workflow fell back to `GITHUB_TOKEN`; close and reopen the PR as a maintainer.
+
+A rerun uses the original workflow revision. If recovery requires a workflow-code
+fix, merge the fix through reviewed PRs into `develop` and `main` without using a
+`release/` head for the maintenance PR into `main`. Then dispatch the corrected
+workflow from `main` with the **original release merge SHA**, not the maintenance
+merge SHA. This keeps the release tag and package immutable while using the corrected
+automation; do not create another release for a back-merge-only repair.
 
 ## 3. Publish the identical tarball to npm
 
