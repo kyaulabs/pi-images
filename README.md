@@ -1,14 +1,14 @@
 # pi-images
 
+[![Conventional Commits](https://img.shields.io/badge/conventional%20commits-1.0.0-fe5196?style=flat&logo=conventionalcommits)](https://www.conventionalcommits.org/en/v1.0.0/)
+[![GitHub license](https://img.shields.io/github/license/kyaulabs/pi-images?logo=gnu)](LICENSE)
+
 `pi-images` keeps Pi's inline images aligned with tmux pane content. It translates the Kitty graphics commands emitted by Pi into one of two formats that tmux can track:
 
 - Kitty Unicode placeholders for Ghostty
 - DEC SIXEL for terminals that implement SIXEL
 
 Pi and tmux do not need source patches.
-
-[![Conventional Commits](https://img.shields.io/badge/conventional%20commits-1.0.0-fe5196?style=flat&logo=conventionalcommits)](https://www.conventionalcommits.org/en/v1.0.0/)
-[![GitHub license](https://img.shields.io/github/license/kyaulabs/pi-images?logo=gnu)](LICENSE)
 
 > [!IMPORTANT]
 > Pi does not expose an API for third-party image protocols. While active, this extension wraps `process.stdout.write` and translates complete Kitty APC sequences before tmux receives them. Changes to Pi's terminal output may require a corresponding update here.
