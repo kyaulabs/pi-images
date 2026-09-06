@@ -125,9 +125,23 @@ gh pr merge N --merge --match-head-commit FULL_REVIEWED_HEAD_SHA \
   `kyaulabs-bot` for automatic back-merge PRs across all kyaulabs repositories.
   Leave `BOT_TOKEN` unchanged. Validate the new secret through the corrected
   workflow before declaring recovery complete; never waive an authorization error.
-- For recovery, dispatch the corrected workflow with version `0.1.0` and the
-  original merge SHA above. Preserve the published tag and tarball, verify the
-  existing package integrity, and complete the reviewed back-merge into `develop`.
+- The first dedicated-token attempt also failed because its resource owner was
+  mistakenly `kyaulabs-bot`. The maintainer corrected it to `kyaulabs` and approved
+  organization access. The token's creating account and resource owner are
+  different settings: create it as the bot, but scope resources to the organization.
+- Recovery completed in workflow run `34052474544`, attempt 2. It used version
+  `0.1.0` and the original merge SHA above, confirmed the existing GitHub package
+  had matching integrity, reconciled the identical release asset, and opened
+  back-merge PR #7 as `kyaulabs-bot`. All PR checks passed; `kyau` reviewed and
+  merged it into `develop` as `6334271` without a lint exception.
+- The `v0.1.0` tag remains at the original release merge. The downloaded
+  `kyaulabs-pi-images-0.1.0.tgz` identifies itself as `@kyaulabs/pi-images@0.1.0`
+  and was verified against release asset SHA-256
+  `54dafb62d431d125a08ee2ef4f4755c32946355233bd05578c44246aedcf4a4e`.
+  npmjs.com publication was intentionally left to the maintainer.
+- For future recovery, use the release's original merge SHA, preserve its tag and
+  tarball, verify package integrity, and complete the reviewed back-merge. Do not
+  rerun the old failing workflow revision that still references `BOT_TOKEN`.
 
 ## Recorded v0.1.0 commit-message exception
 
