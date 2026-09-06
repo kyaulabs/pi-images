@@ -258,7 +258,7 @@ jobs:
 
       - name: Open main-to-develop back-merge PR
         env:
-          GH_TOKEN: ${{ secrets.BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.BACKMERGE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           ahead_by=$(gh api "repos/$GITHUB_REPOSITORY/compare/develop...main" --jq '.ahead_by')
