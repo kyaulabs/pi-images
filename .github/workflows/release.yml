@@ -6,197 +6,282 @@ on:
       - main
     types:
       - closed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (X.Y.Z, without a leading v)
+        required: true
+        type: string
+      merge_sha:
+        description: Full merge commit SHA on main to publish
+        required: true
+        type: string
 
 permissions:
-  contents: write
-  packages: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.event.pull_request.merge_commit_sha }}
+  group: release-${{ inputs.merge_sha || github.event.pull_request.merge_commit_sha }}
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Publish release
+    name: Publish GitHub package and release
     if: >-
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release/') &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'release/') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      MERGE_SHA: ${{ inputs.merge_sha || github.event.pull_request.merge_commit_sha }}
+      VERSION_INPUT: ${{ inputs.version }}
     steps:
-      - name: Validate release branch
-        id: release
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        shell: bash
+      - name: Check out merged release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0b # v7
+        with:
+          ref: ${{ inputs.merge_sha || github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release source and package metadata
+        id: validate
         run: |
           set -euo pipefail
 
-          if [[ "$HEAD_REF" =~ ^release/((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$ ]]; then
-            version="${BASH_REMATCH[1]}"
-          else
-            echo "Release branches must be named release/X.Y.Z; received: $HEAD_REF" >&2
+          if ! printf '%s' "$MERGE_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "::error::merge SHA must contain exactly 40 lowercase hexadecimal characters"
             exit 1
           fi
 
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$VERSION_INPUT"
+          else
+            version="${HEAD_REF#release/}"
+            if [ "$version" = "$HEAD_REF" ]; then
+              echo "::error::release PR head must use release/X.Y.Z"
+              exit 1
+            fi
+          fi
 
-      - name: Check out merged release
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          if ! printf '%s' "$version" | grep -qE '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release version must be stable SemVer in X.Y.Z form"
+            exit 1
+          fi
+          if [ "$(git rev-parse HEAD)" != "$MERGE_SHA" ]; then
+            echo "::error::checkout does not match the requested merge SHA"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$MERGE_SHA" origin/main; then
+            echo "::error::merge SHA is not reachable from main"
+            exit 1
+          fi
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          registry-url: https://npm.pkg.github.com
-          scope: '@kyaulabs'
+          node - "$version" <<'NODE'
+          const fs = require('node:fs');
+          const version = process.argv[2];
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lockfile = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
 
-      - name: Verify package version
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          node <<'NODE'
-          const { readFileSync } = require('node:fs');
-
-          const expected = process.env.VERSION;
-          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
-          const lockfile = JSON.parse(readFileSync('package-lock.json', 'utf8'));
-          const versions = {
-            'package.json': manifest.version,
-            'package-lock.json': lockfile.version,
-            'package-lock.json root package': lockfile.packages?.['']?.version,
-          };
-
-          for (const [file, actual] of Object.entries(versions)) {
-            if (actual !== expected) {
-              throw new Error(`${file} version ${String(actual)} does not match release/${expected}`);
-            }
+          if (manifest.name !== '@kyaulabs/pi-images') {
+            throw new Error('package name must remain @kyaulabs/pi-images');
+          }
+          if (
+            manifest.version !== version ||
+            lockfile.version !== version ||
+            lockfile.packages?.['']?.version !== version
+          ) {
+            throw new Error(`package.json and package-lock.json must both use ${version}`);
           }
           NODE
 
-      - name: Install dependencies
-        run: npm ci
+          if git rev-parse -q --verify "refs/tags/v${version}^{commit}" >/dev/null; then
+            tag_commit=$(git rev-parse "refs/tags/v${version}^{commit}")
+            if [ "$tag_commit" != "$MERGE_SHA" ]; then
+              echo "::error::v$version points to $tag_commit instead of $MERGE_SHA"
+              exit 1
+            fi
+          fi
 
-      - name: Verify package
-        run: npm run check
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@kyaulabs"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Lint tmux plugin
+        run: npm run lint:tmux
+
+      - name: Type-check source
+        run: npm run typecheck
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
 
       - name: Build npm tarball
         id: pack
-        shell: bash
         run: |
           set -euo pipefail
-          package_file="$(npm pack --silent)"
-          test -f "$package_file"
-          echo "file=$package_file" >> "$GITHUB_OUTPUT"
+          npm pack --json > npm-pack.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = require('./npm-pack.json');
+          const results = Array.isArray(report) ? report : Object.values(report);
+          const result = results[0];
 
-      - name: Select changelog range
-        id: changelog
-        env:
-          TAG: ${{ steps.release.outputs.tag }}
-        shell: bash
+          if (
+            results.length !== 1 ||
+            typeof result.filename !== 'string' ||
+            !/^[A-Za-z0-9._-]+\.tgz$/.test(result.filename) ||
+            typeof result.integrity !== 'string' ||
+            !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(result.integrity)
+          ) {
+            throw new Error('npm pack did not report one valid tarball');
+          }
+          if (!fs.statSync(result.filename).isFile()) {
+            throw new Error('npm tarball was not created');
+          }
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `tarball=${result.filename}\nintegrity=${result.integrity}\n`,
+          );
+          NODE
+
+      - name: Select git-cliff release range
+        id: cliff-range
         run: |
-          set -euo pipefail
-
-          # A rerun may find the release tag left by an earlier partial run.
-          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
-            git tag --delete "$TAG"
-          fi
-
-          previous_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
-          if [[ -n "$previous_tag" ]]; then
-            echo "range=$previous_tag..HEAD" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v${VERSION}^{commit}" >/dev/null; then
+            echo "args=--current --verbose" >> "$GITHUB_OUTPUT"
           else
-            echo "range=--unreleased" >> "$GITHUB_OUTPUT"
+            echo "args=--unreleased --tag v${VERSION} --verbose" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Generate release notes
-        uses: orhun/git-cliff-action@v4
+      - name: Generate release notes with git-cliff
+        uses: orhun/git-cliff-action@3d96a18cc4ec17e9dc69ddcc424ccafaf1f78ce2 # v4
         with:
+          version: v2.13.1
           config: cliff.toml
-          args: ${{ steps.changelog.outputs.range }} --tag ${{ steps.release.outputs.tag }} --strip header
+          args: ${{ steps.cliff-range.outputs.args }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          OUTPUT: RELEASE_NOTES.md
+          OUTPUT: release-notes.md
 
-      - name: Create and push tag
+      - name: Publish to GitHub Packages
         env:
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
-          TAG: ${{ steps.release.outputs.tag }}
-        shell: bash
+          LOCAL_INTEGRITY: ${{ steps.pack.outputs.integrity }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
           set -euo pipefail
 
-          remote_tag="$(git ls-remote --tags origin "refs/tags/$TAG^{}" | awk '{print $1}')"
-          if [[ -z "$remote_tag" ]]; then
-            remote_tag="$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')"
-          fi
+          set +e
+          probe=$(npm view "@kyaulabs/pi-images@$VERSION" dist.integrity \
+            --registry=https://npm.pkg.github.com 2>&1)
+          status=$?
+          set -e
 
-          if [[ -n "$remote_tag" ]]; then
-            if [[ "$remote_tag" != "$MERGE_SHA" ]]; then
-              echo "$TAG already exists at $remote_tag, expected $MERGE_SHA" >&2
+          if [ "$status" -eq 0 ]; then
+            if [ "$probe" != "$LOCAL_INTEGRITY" ]; then
+              echo "::error::GitHub package $VERSION exists with different contents"
               exit 1
             fi
-            echo "$TAG already points to the merged release commit"
+            echo "GitHub package version $VERSION already exists with matching contents."
+          elif printf '%s' "$probe" | grep -q 'E404'; then
+            npm publish "$TARBALL" \
+              --registry=https://npm.pkg.github.com \
+              --access=public
           else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag --annotate "$TAG" "$MERGE_SHA" --message "Release $TAG"
-            git push origin "refs/tags/$TAG"
+            printf '%s\n' "$probe" >&2
+            echo "::error::could not query GitHub Packages"
+            exit 1
           fi
 
-      - name: Publish GitHub package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.release.outputs.version }}
-          PACKAGE_FILE: ${{ steps.pack.outputs.file }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          package_name="$(node -p "require('./package.json').name")"
-          if npm view "$package_name@$VERSION" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
-            echo "$package_name@$VERSION is already published to GitHub Packages"
-          else
-            npm publish "$PACKAGE_FILE" --registry=https://npm.pkg.github.com --access public
-          fi
-
-      - name: Create GitHub release
+      - name: Create GitHub Release and attach package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag }}
-          PACKAGE_FILE: ${{ steps.pack.outputs.file }}
-        shell: bash
+          TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
           set -euo pipefail
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md
-            gh release upload "$TAG" "$PACKAGE_FILE" --clobber
-          else
-            gh release create "$TAG" "$PACKAGE_FILE" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
+          tag="v$VERSION"
+          tag_commit=""
+          if git rev-parse -q --verify "refs/tags/${tag}^{commit}" >/dev/null; then
+            tag_commit=$(git rev-parse "refs/tags/${tag}^{commit}")
+            if [ "$tag_commit" != "$MERGE_SHA" ]; then
+              echo "::error::$tag points to $tag_commit instead of $MERGE_SHA"
+              exit 1
+            fi
           fi
 
-      - name: Open back-merge pull request
+          release_exists=false
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>release-probe.log; then
+            release_exists=true
+          elif ! grep -q 'HTTP 404' release-probe.log; then
+            cat release-probe.log >&2
+            echo "::error::could not query the GitHub Release"
+            exit 1
+          fi
+
+          if [ "$release_exists" = true ]; then
+            if [ -z "$tag_commit" ]; then
+              echo "::error::release $tag exists without a local tag"
+              exit 1
+            fi
+            gh release upload "$tag" "$TARBALL" --clobber
+            echo "GitHub Release $tag already exists; package asset reconciled."
+          elif [ -n "$tag_commit" ]; then
+            gh release create "$tag" "$TARBALL" \
+              --title "$tag" \
+              --notes-file release-notes.md
+          else
+            gh release create "$tag" "$TARBALL" \
+              --target "$MERGE_SHA" \
+              --title "$tag" \
+              --notes-file release-notes.md
+          fi
+
+      - name: Open main-to-develop back-merge PR
         env:
-          GH_TOKEN: ${{ secrets.BACKMERGE_TOKEN || secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag }}
-        shell: bash
+          GH_TOKEN: ${{ secrets.BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-
-          existing_pr="$(gh pr list --base develop --head main --state open --json number --jq '.[0].number // empty')"
-          if [[ -n "$existing_pr" ]]; then
-            echo "Back-merge pull request #$existing_pr is already open"
-          else
-            gh pr create \
-              --base develop \
-              --head main \
-              --title "chore(release): back-merge $TAG into develop" \
-              --body "Back-merges the changes released as [$TAG](${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG) into \`develop\`."
+          ahead_by=$(gh api "repos/$GITHUB_REPOSITORY/compare/develop...main" --jq '.ahead_by')
+          if [ "$ahead_by" -eq 0 ]; then
+            echo "develop already contains main; no back-merge is needed."
+            exit 0
           fi
+
+          existing=$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base develop \
+            --head main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Back-merge PR #$existing already exists."
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base develop \
+            --head main \
+            --title "chore(release): back-merge $VERSION into develop" \
+            --body "Automated back-merge after the v$VERSION release. Review and merge this PR to keep develop synchronized with main."

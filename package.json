@@ -39,6 +39,7 @@
     "lint": "eslint .",
     "lint:tmux": "shellcheck pi-images.tmux",
     "test": "tsx --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-lines=96 --test-coverage-branches=95.5 --test-coverage-functions=96 test/*.test.ts",
+    "test:coverage": "npm test",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

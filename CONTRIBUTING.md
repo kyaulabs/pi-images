@@ -14,16 +14,16 @@ Name a work branch with this format:
 <type>/<github-user>-<random-id>-<description>
 ```
 
-Generate the four-character ID with:
+Generate the six-character ID with:
 
 ```sh
-openssl rand -hex 2
+openssl rand -hex 3
 ```
 
 For example:
 
 ```text
-fix/kyau-a0e7-placeholder-cropping
+fix/kyau-a0e7c2-placeholder-cropping
 ```
 
 Use a Conventional Commit type such as `feat`, `fix`, `docs`, `test`, `refactor`, or `ci` for `<type>`.
@@ -104,27 +104,11 @@ Do not attach sensitive images, terminal logs containing image payloads, credent
 
 ## Release process
 
-Create `release/X.Y.Z` from `develop`, then set the package version without creating a local tag:
+Follow [RELEASING.md](RELEASING.md) for the protected `develop` → `release/X.Y.Z` → `main` flow, automated GitHub publication, recovery, and the back-merge into `develop`. Release branches are the exception to the work-branch naming convention above.
 
-```sh
-git switch -c release/X.Y.Z develop
-npm version X.Y.Z --no-git-tag-version
-npm run check
-npm pack --dry-run
-```
+Sign commits with `git commit -S`. The rulesets require signed commits and an approving review for pull requests into `develop` and `main`; releases merge into `main` with a merge commit. Do not bypass these protections.
 
-Commit the resulting `package.json` and `package-lock.json` changes and open a pull request into `main`. When that pull request is merged, the release workflow:
-
-1. verifies that both package files match `X.Y.Z`;
-2. runs the package checks and builds the npm tarball;
-3. creates and pushes the `vX.Y.Z` tag;
-4. publishes the package to GitHub Packages;
-5. creates a GitHub release with git-cliff notes and the npm tarball; and
-6. opens a pull request from `main` back into `develop`.
-
-The tarball attached to the GitHub release is ready for a separate manual npmjs.com publication. The workflow does not publish to npmjs.com.
-
-Repository Actions settings must allow read and write workflow permissions and permit GitHub Actions to create pull requests. Optionally add a fine-grained `BACKMERGE_TOKEN` secret with repository contents read and pull-request write access. Using that token allows the back-merge pull request to trigger normal pull-request workflows; pull requests created with the default `GITHUB_TOKEN` do not trigger additional workflow runs.
+The release workflow publishes to GitHub Packages and attaches the same tarball to a GitHub Release. Only publication to npmjs.com remains manual.
 
 ## License
 
