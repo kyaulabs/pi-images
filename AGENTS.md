@@ -104,7 +104,7 @@ The maintainer explicitly approved proceeding with this one historical formattin
 failure during v0.1.0 preparation:
 
 - PR #2's published merge commit `3c92e19c8dd8b2afb41c4bad1e8bf4db9cac9f70`
-  (`ci: merge workflow parity with pi-widgets (#2)`) contains a 106-character body
+  (`ci: merge workflow parity with pi-widgets (#2)`) contains a 109-character body
   line. Commitlint correctly reports `body-max-line-length` against its 100-character
   limit whenever a checked commit range includes that merge.
 - The three constituent signed commits pass Commitlint. Node.js 22.19.0/24 package
