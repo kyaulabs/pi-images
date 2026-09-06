@@ -259,9 +259,15 @@ npm run check
 npm pack --dry-run
 ```
 
-The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). It scans the checkout and runs the shared package checks. Those checks include strict TypeScript validation, type-aware ESLint analysis, ShellCheck for `pi-images.tmux`, and the test suite. The commit-message hook runs the project-local Commitlint binary. CI repeats all package and commit-message checks and runs Gitleaks against repository history.
+The pre-commit hook requires [`gitleaks`](https://github.com/gitleaks/gitleaks). It scans the checkout and runs the shared package checks. Those checks include strict TypeScript validation, type-aware ESLint analysis, ShellCheck for `pi-images.tmux`, and the test suite. The commit-message hook runs the project-local Commitlint binary. CI repeats the package checks on Node.js 22.19.0 and 24, validates commit messages, and runs Gitleaks against repository history.
 
 The test suite covers image decoding, SIXEL encoding, Kitty chunk reassembly, byte-level stream boundaries, virtual placements, deletion, cache behavior, activation, output interception, and terminal-size parsing. Node's test coverage must remain above 95% for lines, branches, and functions. Protocol changes also require a visual test in the affected terminal and tmux combination.
+
+## Releases
+
+Releases follow the protected `develop` → `release/X.Y.Z` → `main` flow. GitHub Actions validates the package, publishes to GitHub Packages, creates a GitHub Release with generated notes and the npm tarball, and opens a back-merge PR into `develop`. Publishing the attached tarball to npmjs.com is manual.
+
+See [RELEASING.md](RELEASING.md) for setup, review requirements, publication commands, and recovery after a partial workflow failure.
 
 ## Limitations
 
